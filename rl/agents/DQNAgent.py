@@ -30,7 +30,8 @@ class DQNAgent(AgentBase):
             'observation': observation,
             'action': action,
             'innerModel': innerModel,
-            'TXSW': TXSW
+            'TXSW': TXSW,
+            'n_steps':n_steps
         }
         self.model_old = cuda(wrapperModel(
             **model_args, 

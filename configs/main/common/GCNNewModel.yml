@@ -1,0 +1,27 @@
+includes: 
+  - !include configs/main/common/DQNBase.yml
+
+agent: GCNNewModelAgent
+model: GCNNewModel
+dueling-dqn: True
+double-dqn: True
+
+NM-lane-embedding-size: 32
+NM-road-predict-hidden: 32
+NM-scale-by-lane-number: True
+NM-phase-loss-weight: 1
+NM-volume-loss-weight: 1
+
+horizon: 1
+sparsity: 0.01
+first_layer_embedding_size: 32
+out_layer_dim: 64
+strides: 4
+temporal_emb: True
+spatial_emb: True
+activation: GLU
+input_dim: 3
+output_dim: 32
+feature_dim: 3
+mask: False
+hidden_dims: [[32, 32, 32], [32, 32, 32], [32, 32, 32]]

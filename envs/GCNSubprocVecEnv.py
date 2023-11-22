@@ -68,6 +68,7 @@ class EnvVecs:
                  auto_reset = False,**kwargs):
         self.waiting = False
         self.closed = False
+        
         if not is_args_list:
             args = []
             for _ in range(n_envs):
@@ -88,6 +89,7 @@ class EnvVecs:
                     args[i][arg_seed_pos] = seed + i
             env_args = args
 
+
         self.remotes, self.work_remotes = zip(
             *[multiprocessing.Pipe(duplex=True) for _ in range(n_envs)])
         self.processes = []
@@ -105,10 +107,9 @@ class EnvVecs:
         self.is_reset = False
         self.need_stagger = stagger
         self.auto_reset = auto_reset
-
         self._set_observation_space()
         self._set_action_space()
-
+      
 
     def _set_observation_space(self):
         self.remotes[0].send(('observation_space', None))
@@ -166,9 +167,15 @@ class EnvVecs:
         return obs, infos
 
     def replay_count(self, setnum = None):
-        for remote in self.remotes:
-            remote.send(('replay_count', setnum))
-        results = [remote.recv() for remote in self.remotes]
+        # for remote in self.remotes:
+        #     remote.send(('replay_count', setnum))
+        # results = [remote.recv() for remote in self.remotes]
+
+        if setnum is not None:
+            self.env.replay_count=None
+        results=[self.env.replay_count]
+
+
         if setnum is not None:
             assert (np.array(results) == results[0]).all()
         return results[0]
@@ -207,35 +214,97 @@ class EnvVecs:
         return [remote.recv() for remote in self.remotes]
 
 
-def getCityFlowEnvVec(number, logpath, workpath, config, seed = 0, log = '', 
-                      **kwargs):
-    if not isinstance(config, list):
-        config = [config] * number
-    env_args = []
-    for i in range(number):
-        env_args.append([logpath + '/%s/' % i, 
-                        workpath, 
-                        config[i], 
-                        log, 
-                        seed + i, 
-                        False])
-        os.makedirs(env_args[-1][0], exist_ok = True)
-
-    return EnvVecs(CityFlowEnv, 
-                   number, 
-                   env_args, 
-                   is_args_list = True,
-                   **kwargs)
-
 
 class GCNEnvVecs(EnvVecs):
-    def __init__(self,**kwargs):
-        super().__init__(**kwargs)
-        self._set_adj()
+    def __init__(self, env_class, n_envs, env_args,arg_seed_pos = -1, 
+                 seed = 0, is_args_list = False, stagger = False,
+                 auto_reset = False,**kwargs):
+        # super().__init__(**kwargs)
+        self.waiting = False
+        self.closed = False
+        
+        if not is_args_list:
+            args = []
+            for _ in range(n_envs):
+                args.append(list(env_args))
+            if arg_seed_pos != -1:
+                for i in range(n_envs):
+                    args[i][arg_seed_pos] = seed + i
+            env_args = args
+        else:
+            assert(len(env_args) == n_envs)
+            args = []
+            for a in env_args:
+                args.append(list(a))
+            if arg_seed_pos != -1:
+                log('set seed pos when use args list, '
+                    'will change seed in args list.', level = 'WARN')
+                for i in range(n_envs):
+                    args[i][arg_seed_pos] = seed + i
+            env_args = args
+
+        self.env = env_class(*env_args[0])
+
+        # self.remotes, self.work_remotes = zip(
+        #     *[multiprocessing.Pipe(duplex=True) for _ in range(n_envs)])
+        # self.processes = []
+        # for num, [args, work_remote, remote] in enumerate(zip(
+        #                                             env_args, 
+        #                                             self.work_remotes, 
+        #                                             self.remotes)):
+        #     # args = (env_class, work_remote, remote)
+        #     # daemon=True: if the main process crashes, 
+        #     #              we should not cause things to hang
+        #     process = EnvWorker(env_class, args, work_remote, remote, num)
+        #     process.start()
+        #     self.processes.append(process)
+        #     work_remote.close()
+        self.is_reset = False
+        self.need_stagger = stagger
+        self.auto_reset = auto_reset
+
+        # self._set_observation_space()
+        # self._set_action_space()
+        self.observation_space =self.env.observation_space
+        self.action_space=self.env.action_space
+        self.adj=self.env.adj
+        # self._set_adj()
 
     def _set_adj(self):
         self.remotes[0].send(('adj',None))
         self.adj=self.remotes[0].recv()
+
+    def step_wait(self,actions):
+        # results = [remote.recv() for remote in self.remotes]
+        results =[self.env.step(action) for action in actions]  # action [6*array(1,)]
+        self.waiting = False
+        obs, rews, ists, infos = zip(*results)
+        obs = list(obs)
+        infos = list(infos)
+        # very ugly auto reset implementation
+        if self.auto_reset:
+            for num, remote in enumerate(self.remotes):
+                if ists[num]:
+                    remote.send(('reset', None))
+                    obs[num], _ = remote.recv()
+        return obs, np.stack(rews), np.stack(ists), infos
+
+    def step(self, actions):
+        # assert(self.is_reset)
+        # self.step_async(actions)
+        return self.step_wait(actions) #actions [6*array(1,)]
+    
+
+    def reset(self, **kwargs):
+        # for remote in self.remotes:
+        #     remote.send(('reset', None))
+        results=[self.env.reset()]
+        # results = [remote.recv() for remote in self.remotes]
+        if self.need_stagger:
+            results = self.stagger(**kwargs, prev_results = results)
+        obs, infos = zip(*results)
+        self.is_reset = True
+        return obs, infos
 
 
 def getGCNCityFlowEnvVec(number, logpath, workpath, config, seed = 0, log = '',**kwargs):

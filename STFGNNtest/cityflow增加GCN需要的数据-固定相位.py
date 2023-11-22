@@ -3,9 +3,16 @@ import numpy as np
 import json
 import sys
 import os
-
+import os
+import sys
+import socket
+from utils.arguments import parse_args
+from utils.log import log, loginit, logexit
 from utils.log import log
 from utils.utils import gzip_file
+import logging
+
+
 
 
 class TrafficSignal:
@@ -29,33 +36,13 @@ class TrafficSignal:
         self.set_eng_phase()
 
     def _set_observation_space(self):
-        """
-            include intersection dimension.
-            TSflow, TSwait, TSgreen, TStime means array shape
-            TSphase means how many phases available and roadlinks opened in 
-                each phase, and when in yellow phase, returns next controllable 
-                phase.
-            TStime: phase activated time of every lane
-        """
-        # self.observation_space = {
-        #     'TSflow': [len(self.roadnet_info['roadlinks'])],
-        #     'TSwait': [len(self.roadnet_info['roadlinks'])],
-        #     'TSgreen': [len(self.roadnet_info['roadlinks'])],
-        #     'TSphase': self.roadnet_info['phases'][1:],
-        #     'TStime': [1],
-        #     'Envtime': [1],
-        #     'LaneCount': [len(self.roadnet_info['roadlinks'])],
-        #     'RoadLinkDirection': [x['type'] 
-        #                           for x in self.roadnet_info['roadlinks']],
-        # }
-
-        # 增加STFGNN数据
         TSlane=[]
         TSlanelink=[]
         for dic in self.roadnet_info['roadlinks']:
             TSlane.append(set([lk[0] for lk in dic['lanelinks']]))
             TSlanelink.append(dic['lanelinks'])
             
+
         self.observation_space = {
             'TSflow': [len(self.roadnet_info['roadlinks'])],
             'TSwait': [len(self.roadnet_info['roadlinks'])],
@@ -68,8 +55,6 @@ class TrafficSignal:
             'LaneCount': [len(self.roadnet_info['roadlinks'])],
             'RoadLinkDirection': [x['type'] for x in self.roadnet_info['roadlinks']],
         }
-
-
 
     def set_eng_phase(self):
         self.eng.set_tl_phase(self.ID, self.now_idx)
@@ -102,7 +87,6 @@ class TrafficSignal:
             if self.now_idx == self.next_idx:  # light phase keeps unchanged
                 pass
             else:  # the light phase needs to change
-                # change to yellow first, and activate the counter and flag
                 self.now_idx = 0
                 self.set_eng_phase()
                 self.yellow_flag = True
@@ -127,8 +111,7 @@ class TrafficSignal:
         LaneCount = []
         for roadlink in range(len(self.roadnet_info['roadlinks'])):
             count = self.eng.get_roadlink_vehicle_count(self.ID, roadlink)
-            wait_count = self.eng.get_roadlink_waiting_vehicle_count(
-                self.ID, roadlink)
+            wait_count = self.eng.get_roadlink_waiting_vehicle_count(self.ID, roadlink)
             assert count[1] == wait_count[1], f'{count} {wait_count}'
             if count[1] == 0:
                 TSflow.append(0)
@@ -155,33 +138,6 @@ class TrafficSignal:
         self.old_idx = self.now_idx
 
 
-"""data collect and control of one intersection
-Args:
-    ID: intersection name
-    config: config file
-    eng: CityFlow engine
-
-Functions:
-    _init_components: initialize, used in __init__ and reset
-    reset: reset
-    _set_observation_space: set observation space. the space is a dict, means 
-        the array shape in state. 
-    _set_action_space: set action space, an array contains several int, means 
-        different now many choices available in this action. e.g. [4]. 
-    set_signal: set signal phase of this intersection. will handle all yellow 
-        phase internally.
-    step_time: make a tick for TS
-    get_state: get intersection state
-    act: make action. pattern means control rule for traffic light is `set` 
-        (choose a phase) or `switch` (go to next phase). now only support 
-        `set`. actions is a array, if it only contains one int, it is treated
-        as a combined action, which means its range is multiply of all actions.
-        although the action of intersections with only one action is ambiguous,
-        it's fine to just treat it as a combined action.
-    get_reward: get this intersecion's reward. weight means the weight for 
-        every reward part.
-    update_old: update old_idx etc. in self.TS
-"""
 
 
 class Intersection:
@@ -198,146 +154,35 @@ class Intersection:
         self._set_observation_space()
         self._set_action_space()
 
+
     def _init_components(self):
         self.roadnet_info = self.config['ROADNET_INFO'][self.ID]
-
-        self.TS = TrafficSignal(self.ID, self.eng, self.config['YELLOW_TIME'],
-                                self.roadnet_info)
+        self.TS = TrafficSignal(self.ID, self.eng, self.config['YELLOW_TIME'],self.roadnet_info)
         self.last_reward = 0
-
         self.saved_phases = np.zeros((self.save_lane_count_step,), dtype = int)
         self.saved_phases[:] = -1
-
-        self.lane_vehicle_count_mat = np.zeros((  # this is in count
+        self.lane_vehicle_count_mat = np.zeros((
             self.save_lane_count_step, 
             len(self.roadnet_info['connection']), 3), dtype = int)
         self.lane_vehicle_out_count_mat = np.zeros((
             self.save_lane_count_step, 
             len(self.roadnet_info['connection']), 3), dtype = int)
 
+
     def reset(self):
         self._init_components()
 
-    def _get_road_direction_idx(self, roadname, direction):
-        for num, i in enumerate(self.roadnet_info['roadlinks']):
-            if i['startRoad'] == roadname and i['type'] == direction:
-                return num
-        raise ValueError(roadname, direction)
-
-    """
-       Intersection: CityFlow.list_intersections
-       roadlinks: Intersection.[0..11] cross this intersection
-       Roads: belong to intersection it start with. intersection.roadnames
-       lanes: belongs to roads, order as DirectionNames
-
-       DirectionNames: 3 direction name, [left, straight, right]
-       RoadsOut: the terminal intersection of a road belongs to this 
-           intersection that out of this intersection [4]
-       RoadsIn: the start inter_x.RoadsOut_y of a road belongs to adjacent 
-           intersection that goes into this intersection, [[x, y] * 12]
-       RoadLinksOut: roadlink_i go out to which RoadsOut [12]
-       RoadLinksIn: roadlink_i go in from which RoadsIn [12]
-       RoadOutLanes: lane number of roadout_i [4 * 3]
-       LaneCount: roadlink_i lane number
-       InLaneVehicleNumber: vehicle number that has entered the lane, [4, 3],
-           [i, j] means RoadsIn[i] and DirectionNames[j]
-       OutLaneVehicleNumber: vehicle number that has leaved the lane, [4, 3]
-           [i, j] means RoadsIn[i] and DirectionNames[j]
-           *lane change will count. number is small, so ignore now.
-       TSprevphases: previous phase actions, its shape
-       RoadLinkDirection: the direction name of roadlink_i
-    """
     def _set_observation_space(self):
         tot = self.TS.observation_space
         tot['DirectionNames'] = [
             'turn_left',
             'go_straight',
-            'turn_right'
-        ]  # now assume three direction
-        self.lane_direction_number = len(tot['DirectionNames'])
-        self.roadnames = list(self.roadnet_info['connection'].keys())
-        self.roadnames.sort()
-        tot['RoadsOut'] = []
-        tot['RoadsIn'] = []
-        for road in self.roadnames:
-            interto = self.roadnet_info['connection'][road][0]
-            intertoid = self.intersection_names.index(interto) \
-                if interto in self.intersection_names else \
-                -1 - self.virtual_intersection_names.index(interto)
-            tot['RoadsOut'].append(intertoid)
-        tot['RoadLinksOut'] = []
-        tot['RoadLinksIn'] = []  # can't fill now, fill later
-        tot['RoadOutLanes'] = [[0] * len(tot['DirectionNames'])
-                               for _ in self.roadnames]  # also can't fill now
-        tot['LaneCount'] = []
-        for rl in self.roadnet_info['roadlinks']:
-            tot['RoadLinksOut'].append(self.roadnames.index(rl['endRoad']))
-            tot['LaneCount'].append(rl['lanenumber'])
-        tot['InLaneVehicleNumber'] = [self.save_lane_count_step, 
-                                      len(self.roadnames), 
-                                      self.lane_direction_number]
-        tot['OutLaneVehicleNumber'] = [self.save_lane_count_step, 
-                                       len(self.roadnames), 
-                                       self.lane_direction_number]
+            'turn_right'] 
         tot['TSprevphases'] = [self.save_lane_count_step]
-        # 增加STFGNN数据收集
         tot['TSprelaneflow']=[self.save_lane_count_step]
         self.observation_space = tot
         self.saved_lane_flow=[[set() for _ in ls] for ls in self.observation_space['TSlane']]
-        
 
-    def _set_road_links_in(self, roadname2id):
-        self.roadinnames = []
-        rlin = self.observation_space['RoadLinksIn']
-        rin = self.observation_space['RoadsIn']
-        for rl in self.roadnet_info['roadlinks']:
-            rn = rl['startRoad']
-            if rn not in roadname2id:
-                rlin.append(-1)
-            else:
-                if rn not in self.roadinnames:
-                    self.roadinnames.append(rn)
-                    rin.append(roadname2id[rn])
-                rlin.append(self.roadinnames.index(rn))
-
-    def _get_road_id(self, inters, ask_inter_id, ask_roadnumber):
-        torid = -1
-        for num, [i, j] in enumerate(self.observation_space['RoadsIn']):
-            if i >= 0 and ask_inter_id == inters[i].ID and ask_roadnumber == j:
-                torid = num
-        if torid != -1:
-            return torid
-        torid = []
-        for num, [i, j] in enumerate(self.observation_space['RoadsIn']):
-            if i < 0 and ask_roadnumber == j:
-                torid.append([i, num])
-        return torid
-
-    def _update_lanename(self, lanename2roaddirection, inters, 
-                         now_in_lane_vehicles, last_in_lane_vehicles):
-        self.lanename2roaddirection = lanename2roaddirection
-        self.now_in_lane_vehicles = now_in_lane_vehicles
-        self.last_in_lane_vehicles = last_in_lane_vehicles
-        for rn, [rname, toid] in enumerate(zip(
-                self.roadnames, 
-                self.observation_space['RoadsOut'])):
-            if toid < 0:
-                continue
-            o_inter = inters[toid]
-            torid = -1
-            for num, [i, j] in enumerate(o_inter.observation_space['RoadsIn']):
-                if i >= 0 and self == inters[i] and rn == j:
-                    torid = num
-            assert torid == o_inter._get_road_id(inters, self.ID, rn)
-            now_lanen = 0
-            for dn, d in enumerate(self.observation_space['RoadOutLanes'][rn]):
-                # now assume lane order same as direction name order
-                for _ in range(d):
-                    lanename = '%s_%d' % (rname, now_lanen)
-                    now_lanen += 1
-                    self.lanename2roaddirection[lanename] = [toid, torid, dn]
-                    self.now_in_lane_vehicles[lanename] = set()
-                    self.last_in_lane_vehicles[lanename] = set()
 
     def _set_action_space(self):
         tot = [self.TS.action_space]
@@ -351,18 +196,9 @@ class Intersection:
 
     def get_state(self):
         res = self.TS.get_state()
-        DCphase = []
-        res['InLaneVehicleNumber'] = self.lane_vehicle_count_mat
-        res['OutLaneVehicleNumber'] = self.lane_vehicle_out_count_mat
         self.saved_phases[-1] = res['TSphase']
         res['TSprevphases'] = list(self.saved_phases)
-        res['DCphase'] = DCphase
         res['pressure'] = self._get_pressure_observation()
-        
-        # 增加STFGNN数据采集 
-        res['Inlaneflow']=[[0 for _ in ln] for ln in self.saved_lane_flow]
-        res['TSlaneflow']=[[0 for _ in ln] for ln in self.observation_space['TSlane']]
-
         return res
 
     def act(self, actions, pattern):
@@ -421,7 +257,6 @@ class Intersection:
     def _get_average_pressure(self, type, weight):
         lane_count = self.eng.get_lane_vehicle_count()
         if type.lower() == 'intersection':
-            # count intersection as one unit, |Sigma(#in) - Sigma(#out)|
             lanelinks = []
             for roadlink in self.roadnet_info['roadlinks']:
                 lanelinks.extend(roadlink['lanelinks'])
@@ -435,7 +270,6 @@ class Intersection:
                 res -= lane_count[e]
             return -abs(res) * weight
         elif type.lower() == 'roadlink':
-            # count every roadlink pressure and average, Sigma(|P_ri|)
             lanelinks = [x['lanelinks'] 
                          for x in self.roadnet_info['roadlinks']]
             res = []
@@ -452,7 +286,6 @@ class Intersection:
                 res.append(RR)
             return -np.array(res).mean() * weight
         elif type.lower() == 'lanelink':
-            # count every lanelink pressure and average
             res = []
             for roadlink in self.roadnet_info['roadlinks']:
                 for s, t in roadlink['lanelinks']:
@@ -501,59 +334,32 @@ class Intersection:
         self.TS.update_old()
 
 
-class Flow:
-    def __init__(self):
-        pass
-
-
-"""CityFlow Environment, split action into and combine data from Intersections
-
-Args:
-    log_path: a folder to save log.
-    work_folder: where to read flowFile and roadnetFile.
-    config: config file.
-    logfile: if set, save cityflow engine log in this file.
-    seed: engine seed.
-    suffix: whether add suffix to files used or generated in engine. if all 
-        files save in same folder, we should add suffix to avoid overwrite.
-    predefined_flow: whether use predefined flow file. if set False, will use 
-        flow generator to generate flow.
-Functions:
-    ???
-"""
 
 
 class CityFlowEnv:
-    def __init__(self, log_path, work_folder, config, logfile = '', seed = 0, 
-                 suffix = True):
+    def __init__(self, log_path, work_folder, config, logfile = '', seed = 0, suffix = True,**kwargs):
         self.log_path = log_path
         self.work_folder = work_folder
-        self.config = config
+        self.config = config[0]
         self.logfile = logfile
         self.seed = seed
-
+        self.all_vehicles = set()
         self.env_padding = 'ENV_PADDING' in config and config['ENV_PADDING']
-
         file_suffix = ''
-        if suffix:
-            file_suffix = '_' + str(seed)
+        if suffix:file_suffix = '_' + str(seed)
 
-        self.replay_path = os.path.join(self.log_path,
-                                        "replay%s.txt" % file_suffix) + '.%04d'
+        self.replay_path = os.path.join(self.log_path,"replay%s.txt" % file_suffix) + '.%04d'
         self.replay_count = 0
         config_dict = {
             "interval": self.config["INTERVAL"],
             "seed": seed,
             "dir": "",
-            "roadnetFile": os.path.join(self.work_folder,
-                                        self.config['ROADNET_FILE']),
-            "flowFile": os.path.join(self.work_folder,
-                                     self.config["FLOW_FILE"]),
+            "roadnetFile": os.path.join(self.work_folder,self.config['ROADNET_FILE']),
+            "flowFile": os.path.join(self.work_folder,self.config["FLOW_FILE"]),
             "rlTrafficLight": True,
             "laneChange": True,
             "saveReplay": self.config["SAVEREPLAY"],
-            "roadnetLogFile": os.path.join(self.log_path,
-                                           "roadnet%s.json" % file_suffix),
+            "roadnetLogFile": os.path.join(self.log_path,"roadnet%s.json" % file_suffix),
             "replayLogFile": self.replay_path % self.replay_count
         }
 
@@ -563,23 +369,20 @@ class CityFlowEnv:
 
         config_path = os.path.join(log_path, "cityflow_config%s" % file_suffix)
         self.config_path = config_path
+
         with open(config_path, "w") as f:
             json.dump(config_dict, f)
             self.log("dump cityflow config:", config_path, level = 'TRACE')
-        # print(config_path, log)
+     
         if len(logfile) > 0:
             logfile = os.path.join(log_path, '%s%s' % (logfile, file_suffix))
             self.logfile = logfile
         self.init_engine()
-
         self.list_inter_log = None
 
-        # check min action time
         if self.config["MIN_ACTION_TIME"] <= self.config["YELLOW_TIME"]:
-            self.log("MIN_ACTION_TIME should include YELLOW_TIME", 
-                     level = "ERROR")
+            self.log("MIN_ACTION_TIME should include YELLOW_TIME", level = "ERROR")
             pass
-            # raise ValueError
 
         roadnet_info_keys = list(self.config['ROADNET_INFO'].keys())
         roadnet_info_keys.sort()
@@ -599,83 +402,10 @@ class CityFlowEnv:
             assert self.virtual_direction_names == inter.observation_space[
                 'DirectionNames'
             ]
-        self.intername2idx = {}
-        self.roadname2id = {}
-        self.lanename2roaddirection = {}
-        self.now_in_lane_vehicles = {}
-        self.last_in_lane_vehicles = {}
-        self.all_vehicles = set()
-        self.wait_ticks = 0
-        for num, inter in enumerate(self.list_intersection):
-            self.intername2idx[inter.ID] = num
-            assert roadnet_info_keys[num] == inter.ID
-            for rnum, rname in enumerate(inter.roadnames):
-                self.roadname2id[rname] = [num, rnum]
-        for ID in virtual_inters:
-            v_inter = virtual_inters[ID]
-            num = virtual_inter_keys.index(ID)
-            roadnames = list(v_inter['connection'].keys())
-            assert len(roadnames) == 1
-            self.roadname2id[roadnames[0]] = [-1 - num, 0]
-        for inter in self.list_intersection:
-            inter._set_road_links_in(self.roadname2id)
-            for rl in inter.roadnet_info['roadlinks']:
-                if rl['startRoad'] in self.roadname2id:
-                    num, rnum = self.roadname2id[rl['startRoad']]
-                    if num < 0:
-                        vid = -1 - num
-                        typeid = self.virtual_direction_names.index(rl['type'])
-                        self.virtual_road_out_lanes[
-                            vid, typeid] += rl['lanenumber']
-                        continue
-                    ninter = self.list_intersection[num]
-                    ninter.observation_space['RoadOutLanes'][rnum][
-                        ninter.observation_space['DirectionNames'].index(
-                            rl['type'])
-                    ] += rl['lanenumber']
-        for inter in self.list_intersection:
-            inter._update_lanename(self.lanename2roaddirection, 
-                                   self.list_intersection,
-                                   self.now_in_lane_vehicles,
-                                   self.last_in_lane_vehicles)
-            # self.log(inter.ID, inter.observation_space)
-        self.update_virtual_lanename(virtual_inters, virtual_inter_keys)
-        # self.log(self.lanename2roaddirection)
-
-        self.list_inter_log = [[] for i in range(len(self.list_intersection))]
-
-        self._set_adj_mat()
+     
         self._set_observation_space()
         self._set_action_space()
 
-    def update_virtual_lanename(self, virtual_inters, virtual_inter_keys):
-        for v_num, v_inter_key in enumerate(virtual_inter_keys):
-            v_inter = virtual_inters[v_inter_key]
-            rn = 0
-            rname = list(v_inter['connection'].keys())[0]
-            toiname = v_inter['connection'][rname][0]
-            toid = -999
-            for num, inter in enumerate(self.list_intersection):
-                if inter.ID == toiname:
-                    toid = num
-                    break
-            assert toid >= 0
-            o_inter = self.list_intersection[toid]
-            torid = o_inter._get_road_id(self.list_intersection, 
-                                         self, rn)
-            assert isinstance(torid, list)
-            for i, j in torid:
-                if virtual_inter_keys[-1 - i] == v_inter_key:
-                    torid = j
-            now_lanen = 0
-            dn = 0
-            for dn, d in enumerate(self.virtual_road_out_lanes[v_num]):
-                for _ in range(d):
-                    lanename = '%s_%d' % (rname, now_lanen)
-                    now_lanen += 1
-                    self.lanename2roaddirection[lanename] = [toid, torid, dn]
-                    self.now_in_lane_vehicles[lanename] = set()
-                    self.last_in_lane_vehicles[lanename] = set()
 
     def log(self, *argv, **kwargs):
         if 'linux' in sys.platform:
@@ -688,23 +418,6 @@ class CityFlowEnv:
     def init_engine(self):
         self.eng = Engine(self.config_path, 4, self.logfile)
 
-    def _set_adj_mat(self):
-        n = len(self.list_intersection)
-        self.adj_mat = np.zeros((n, n))
-        self.adj_mat[:] = 1e100
-        for i in self.config['ROADNET_INFO'].keys():
-            if i not in self.intername2idx.keys():
-                continue
-            iidx = self.intername2idx[i]
-            conn = self.config['ROADNET_INFO'][i]['connection']
-            for road in conn:
-                j, dist = conn[road]
-                if j not in self.intername2idx.keys():
-                    continue
-                jidx = self.intername2idx[j]
-                self.adj_mat[iidx, jidx] = dist
-        for i in range(n):
-            self.adj_mat[i, i] = 0
 
     def _set_observation_space_one(self, i):
         observation_space = self.list_intersection[i].observation_space
@@ -714,19 +427,9 @@ class CityFlowEnv:
         self.observation_space = []
         for i in range(len(self.list_intersection)):
             self.observation_space.append(self._set_observation_space_one(i))
-        """
-        for obs in self.observation_space:
-            if obs != self.observation_space[0] and self.env_padding and False:
-                self.log('observation space not all same, and env_padding is '
-                         'set, which is not implemented!', level = 'ERROR')
-                raise ValueError
-        """
         self.observation_space = {
             'intersections': self.observation_space,
-            'virtual_intersection_out_lines': self.virtual_road_out_lanes,
-            'adj_mat': self.adj_mat
         }
-
 
     def _set_action_space_one(self, i):
         return self.list_intersection[i].action_space
@@ -735,18 +438,11 @@ class CityFlowEnv:
         self.action_space = []
         for i in range(len(self.list_intersection)):
             self.action_space.append(self._set_action_space_one(i))
-        """
-        for act in self.action_space:
-            if act != self.action_space[0] and self.env_padding:
-                self.log('action space not all same, and env_padding is set, '
-                         'which is not implemented!', level = 'ERROR')
-                raise ValueError
-        """
+
 
     def reset(self):
         self.eng.reset()
         self.replay_count += 1
-        # self.eng.set_random_seed(self.seed + self.replay_count)
         if self.config['SAVEREPLAY']:
             self.eng.set_replay_file(self.replay_path % self.replay_count)
             old_replay = self.replay_path % (self.replay_count - 1)
@@ -760,20 +456,11 @@ class CityFlowEnv:
         for inter in self.list_intersection:
             inter.step_time()
 
-        # self.flow_generator.reset()
-
-        for k in self.now_in_lane_vehicles:
-            self.now_in_lane_vehicles[k] = set()
-        for k in self.last_in_lane_vehicles:
-            self.last_in_lane_vehicles[k] = set()
-
-        self.all_vehicles.clear()
+        # self.all_vehicles.clear()
         self.wait_ticks = 0
-
         state = self._collect_state()
         return state, {'average_time': 0.0, 'average_delay': 0.0}
-    
-    # STFGNN
+
     def _renew_in_lane_flow(self):
         lane_vehicles=self.eng.get_lane_vehicles()
         for inter in self.list_intersection:
@@ -781,7 +468,6 @@ class CityFlowEnv:
                 for j,k in enumerate(ln):
                     inter.saved_lane_flow[i][j]=set(lane_vehicles[k])-inter.saved_lane_flow[i][j]
 
-    # STFGNN
     def _add_in_lane_flow(self):
         lane_vehicles=self.eng.get_lane_vehicles()
         for inter in self.list_intersection:
@@ -790,13 +476,13 @@ class CityFlowEnv:
                     inter.saved_lane_flow[i][j]=set(lane_vehicles[k])-inter.saved_lane_flow[i][j]
                     # for x in lane_vehicles[k]:
                     #     inter.saved_lane_flow[i][j].add(x) 
-
+                   
+                   
 
     def _collect_state(self):
         res = []
         for inter in self.list_intersection:
-            res.append(inter.get_state())
-            # self.log(inter.ID, res[-1]['InLaneVehicleNumber'], level='TRACE')
+            res.append(inter.get_state())      
         return res
 
     def _collect_reward(self):
@@ -814,27 +500,23 @@ class CityFlowEnv:
     def _average_delay(self):
         return self.eng.get_average_delay()
 
-    def step(self, action):
+
+    def step(self, actions):
         if self.config['ACTION_PATTERN'] == 'switch':
             raise NotImplementedError('ACTION_PATTERN `switch` '
                                       'is not implemented')
 
         all_reward = np.zeros(len(self.list_intersection), dtype='float')
         for i in range(self.config['MIN_ACTION_TIME']):
-            if i == 0:
-                self.step_lane_vehicles()
-            # STFGNN
             if i==0:
                 self._renew_in_lane_flow()
             else:
                 self._add_in_lane_flow()
-
-            self._inner_step(action, self.config['ACTION_PATTERN'])
+            self._inner_step(actions, self.config['ACTION_PATTERN'])
             state = self._collect_state()
             all_reward += self._collect_reward()
             done = self._is_done()
 
-        # STFGNN
         lane_vehicles=self.eng.get_lane_vehicles()
         for j,inter in enumerate(self.list_intersection):
             state[j]["Inlaneflow"]=[[len(ls) for ls in ln] for ln in inter.saved_lane_flow]
@@ -853,47 +535,12 @@ class CityFlowEnv:
 
         return state, all_reward, done, infos
 
-    def step_lane_vehicles(self):
-        for inter in self.list_intersection:
-            inter.lane_vehicle_count_mat[:-1] = \
-                inter.lane_vehicle_count_mat[1:]
-            inter.lane_vehicle_count_mat[-1] = 0
-            inter.lane_vehicle_out_count_mat[:-1] = \
-                inter.lane_vehicle_out_count_mat[1:]
-            inter.lane_vehicle_out_count_mat[-1] = 0
-            inter.saved_phases[:-1] = inter.saved_phases[1:]
-
-    def update_lane_vehicles(self, lane_vehicles):
-        for i in self.now_in_lane_vehicles:  # copy current to last
-            self.last_in_lane_vehicles[i] = self.now_in_lane_vehicles[i].copy()
-            self.now_in_lane_vehicles[i].clear()
-
-        # for i in self.now_in_lane_vehicles:
-            # self.now_in_lane_vehicles[i].clear()
-        for k, vs in lane_vehicles.items():
-            if k in self.lanename2roaddirection:
-                for v in vs:
-                    if 'shadow' in v:
-                        continue
-                    self.now_in_lane_vehicles[k].add(v)
-
-        for k in self.now_in_lane_vehicles:
-            i, r, d = self.lanename2roaddirection[k]
-            inter = self.list_intersection[i]
-            inter.lane_vehicle_count_mat[-1, r, d] += \
-                len(self.now_in_lane_vehicles[k] 
-                    - self.last_in_lane_vehicles[k])
-            inter.lane_vehicle_out_count_mat[-1, r, d] += \
-                len(self.last_in_lane_vehicles[k] 
-                    - self.now_in_lane_vehicles[k])
-
 
     def _inner_step(self, actions, pattern):
         for action, inter in zip(actions, self.list_intersection):
             inter.update_old()
             inter.act(action, pattern)
         for i in range(int(1 / self.config['INTERVAL'])):
-            # self.flow_generator.check(self.eng.get_current_time())
             self.eng.next_step()  # catch errors and report to above
             if 'NOT_COUNT_VEHICLE_VOLUME' not in self.config or not self.config['NOT_COUNT_VEHICLE_VOLUME']:
                 lane_vehicles = self.eng.get_lane_vehicles()
@@ -905,9 +552,153 @@ class CityFlowEnv:
                 for v in v_speeds:
                     if v_speeds[v] > 0.1:
                         self.wait_ticks -= 1
-                self.update_lane_vehicles(lane_vehicles)
+                # self.update_lane_vehicles(lane_vehicles)
         for inter in self.list_intersection:
             inter.step_time()
 
     def get_default_action(self):
         return [x.get_default_action() for x in self.list_intersection]
+
+
+def get_args(args):
+    args = vars(parse_args(args))
+    args = loginit(args)
+    log(args, level = 'ALL')
+    env_args = {
+                'number': args["threads"], 
+                'log_path': args["log_folder"],
+                'work_folder': '.', 
+                'config': args["train_cityflow_config"], 
+                'log': args["cityflow_log"]
+            }
+    # env_args['log_path'] = args["log_folder"] + '/get_data/' 
+
+    return env_args
+
+
+# 节点生成。节点生成只需要调用env.observation_space
+def make_adj(env):
+    t0=time.time()
+    adj_gcn={}
+    node_name={}
+    obs_space=env.observation_space['intersections']
+    c=0
+    for _,space in enumerate(obs_space):
+        for lks in space['TSlanelink']:
+            name=set()
+            adj=set()
+            for _,lk in enumerate(lks):
+                name.add(lk[0])
+                adj.add(lk[1])
+            adj_gcn[c]=adj
+            node_name[c]=name
+            c+=1
+
+    # 将adj_gcn中的节点名称换成编号 暴力搜索
+    empty=set()
+    emp_node=0
+    stfgnn_adj={}
+    for c1,value in adj_gcn.items():
+        nabor=set()
+        for c2,name in node_name.items():
+            if value&name:
+                nabor.add(c2)
+        stfgnn_adj[c1]=list(nabor)
+
+        # 验证
+        if not nabor:
+            emp_node+=1
+            empty=empty|nabor
+
+    t1=time.time()
+    logging.info(f"邻接矩阵生成耗时：{t1-t0}s。{empty}个节点的下游节点不在72个节点中，即其下游节点不是任何节点的上游节点，为虚拟节点。")
+    with open('./stfgnn_adj.json','w') as f:
+        json.dump(stfgnn_adj,f)
+
+     # 验证
+    inter=set()
+    vitual=set(["inter_3972","inter_860","inter_27274","inter_20734","inter_971",
+            "inter_25206","inter_25209","inter_1244","inter_798","inter_99999"])
+    for ln in empty:
+        inter.add("inter"+"_"+ln.split('_')[2])
+    if not inter-vitual:
+        logging.info(f"没有下游车道的道路其下游路口都是虚拟路口。有{emp_node}个道路没有下游路口")
+    else:
+        logging.info(f"没有下游车道的道路其下游路口也不全是虚拟路口。没有下游车道的路口有{emp_node}个，下游是非虚拟路口有：{len(inter-vitual)}个,非虚拟下游路口是{inter-vitual}")
+
+    return stfgnn_adj
+
+
+def write_sample(deq,state,f):
+    # deq.append([[sum(fl)/len(fl) for fl in st["Inlaneflow"]] for st in state])
+    # if len(deq)==13:
+    #     x=list(deq)[:-1]
+    #     y=deq[-1]
+        # f.write(json.dumps([x,y])+'\n')
+
+    # 随机动作
+    x=[[[st["TSphase"]]]+[sum(fl)/len(fl) for fl in st["Inlaneflow"]] for st in state]
+    f.write(json.dumps(x)+'\n')
+
+    
+
+import os
+import time
+import random
+import json
+from collections import deque
+# script_directory = os.path.dirname(os.path.abspath(__file__))
+# os.chdir(script_directory)
+
+
+if __name__=="__main__":
+    argv=["main.py", "--config", "configs/main/GCNUniLight.yml", "--cityflow-config", "configs/cityflow/SH1.yml"]
+    logging.basicConfig(filename='StfgnnDataset.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    env_args=get_args(argv)
+    env=CityFlowEnv(**env_args)
+    data=[]
+    epochs=10000
+    env.reset()
+    make_adj(env)
+
+    # 临时数据
+    deq=deque(maxlen=13)
+    t0=time.time()
+    with open('X_Y随机动作.json','a') as f:
+        for i in range(epochs) :
+            actions=[[random.randint(0,8)] for _ in range(6)]
+            state, all_reward, done, infos=env.step(actions)
+            write_sample(deq,state,f)
+    t1=time.time()
+
+    # logging...
+    # logging.basicConfig(filename='cityflow.log', level=logging.INFO, format='%(asctime)s - %(levelname)s - %(message)s')
+    # logging.info(f"删除了原UniLight中STFGNN不需要的数据收集操作，增加STFGNN需要的数据收集,采用cityflow原始固定相位。epochs:{epochs},time_span:{t1-t0:.2f}s,evrage time span every epoch:{(t1-t0)/epochs:.2f}s")
+    # logging.info(f" state, all_reward, done, infos:{state, all_reward, done, infos}")
+    
+    
+
+
+                
+
+            
+        
+    
+    
+
+    
+
+
+
+
+
+
+
+
+
+
+    
+
+
+
+            

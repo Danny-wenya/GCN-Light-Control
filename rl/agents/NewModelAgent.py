@@ -87,8 +87,8 @@ class NewModelAgent(DQNAgent):
         if not p_p.requires_grad:  # no grad no loss
             return
         _, maxid = res.max(dim = -1)
-        laneid = self.phaseid2lanes[maxid].unsqueeze(-1)  # [B, L, 1]
-        self.phase_loss.append(self.phase_loss_func(p_p, laneid))
+        laneid = self.phaseid2lanes[maxid] # [B, L]
+        self.phase_loss.append(self.phase_loss_func(p_p.squeeze(), laneid))
 
     def gather_volume_loss(self, state, road_relation, predict_key = 'predict'):
         ri2rl = torch.tensor(road_relation['RoadIn2RoadLink'])
@@ -127,7 +127,7 @@ class NewModelAgent(DQNAgent):
     def f_s(self, states):
         states, l_emb, p_p = zip(*states)
         res = []
-        v_p = []
+        v_p = [] 
         v_p_realp = []
         for i in self.indices:
             v_p.append(self.selected_model.inner.volume_predict(

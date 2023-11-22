@@ -214,6 +214,11 @@ class ReplayBuffer:
 
     def cuda(self):
         return self
+    
+    @staticmethod
+    def write_sample(state,f):
+        x=[[[int(st["TSphase"])]]+[sum(fl)/len(fl) for fl in st["Inlaneflow"]] for st in state[0]]
+        f.write(json.dumps(x)+'\n')
 
     def reset(self, state):
         self._reset = True
@@ -223,7 +228,7 @@ class ReplayBuffer:
         self._ist_deque.clear()
         self._state_deque.append(state)
 
-    def append(self, action, reward, next_s, ist):
+    def append(self, action, reward, next_s, ist,epoch):
         assert(self._reset)
         self._state_deque.append(next_s)
         self._action_deque.append(action)
@@ -251,6 +256,11 @@ class ReplayBuffer:
                     data[4].append(self._ist_deque[-1][num])
             for one_data in zip(*data):
                 self._buffer_append(*one_data)
+
+        # 在此处插入STFGNN的数据观察
+        with open(f"./unilightGCN_{epoch}.json","a") as f:
+            self.write_sample(next_s,f)
+
 
     def _buffer_append(self, state, action, reward, next_s, ist):
         if len(self.buffer) < self.maxlen:

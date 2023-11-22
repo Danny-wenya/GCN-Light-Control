@@ -3,9 +3,16 @@ import numpy as np
 import json
 import sys
 import os
-
+import os
+import sys
+import socket
+from utils.arguments import parse_args
+from utils.log import log, loginit, logexit
 from utils.log import log
 from utils.utils import gzip_file
+import logging
+
+
 
 
 class TrafficSignal:
@@ -37,39 +44,17 @@ class TrafficSignal:
                 phase.
             TStime: phase activated time of every lane
         """
-        # self.observation_space = {
-        #     'TSflow': [len(self.roadnet_info['roadlinks'])],
-        #     'TSwait': [len(self.roadnet_info['roadlinks'])],
-        #     'TSgreen': [len(self.roadnet_info['roadlinks'])],
-        #     'TSphase': self.roadnet_info['phases'][1:],
-        #     'TStime': [1],
-        #     'Envtime': [1],
-        #     'LaneCount': [len(self.roadnet_info['roadlinks'])],
-        #     'RoadLinkDirection': [x['type'] 
-        #                           for x in self.roadnet_info['roadlinks']],
-        # }
-
-        # 增加STFGNN数据
-        TSlane=[]
-        TSlanelink=[]
-        for dic in self.roadnet_info['roadlinks']:
-            TSlane.append(set([lk[0] for lk in dic['lanelinks']]))
-            TSlanelink.append(dic['lanelinks'])
-            
         self.observation_space = {
             'TSflow': [len(self.roadnet_info['roadlinks'])],
             'TSwait': [len(self.roadnet_info['roadlinks'])],
             'TSgreen': [len(self.roadnet_info['roadlinks'])],
             'TSphase': self.roadnet_info['phases'][1:],
-            'TSlane':TSlane,
-            'TSlanelink':TSlanelink,
             'TStime': [1],
             'Envtime': [1],
             'LaneCount': [len(self.roadnet_info['roadlinks'])],
-            'RoadLinkDirection': [x['type'] for x in self.roadnet_info['roadlinks']],
+            'RoadLinkDirection': [x['type'] 
+                                  for x in self.roadnet_info['roadlinks']],
         }
-
-
 
     def set_eng_phase(self):
         self.eng.set_tl_phase(self.ID, self.now_idx)
@@ -194,7 +179,9 @@ class Intersection:
         self.virtual_intersection_names = virtual_intersection_names
         self.save_lane_count_step = 5
         self.lanename2roaddirection = {}
+
         self._init_components()
+
         self._set_observation_space()
         self._set_action_space()
 
@@ -280,11 +267,7 @@ class Intersection:
                                        len(self.roadnames), 
                                        self.lane_direction_number]
         tot['TSprevphases'] = [self.save_lane_count_step]
-        # 增加STFGNN数据收集
-        tot['TSprelaneflow']=[self.save_lane_count_step]
         self.observation_space = tot
-        self.saved_lane_flow=[[set() for _ in ls] for ls in self.observation_space['TSlane']]
-        
 
     def _set_road_links_in(self, roadname2id):
         self.roadinnames = []
@@ -358,11 +341,6 @@ class Intersection:
         res['TSprevphases'] = list(self.saved_phases)
         res['DCphase'] = DCphase
         res['pressure'] = self._get_pressure_observation()
-        
-        # 增加STFGNN数据采集 
-        res['Inlaneflow']=[[0 for _ in ln] for ln in self.saved_lane_flow]
-        res['TSlaneflow']=[[0 for _ in ln] for ln in self.observation_space['TSlane']]
-
         return res
 
     def act(self, actions, pattern):
@@ -524,11 +502,10 @@ Functions:
 
 
 class CityFlowEnv:
-    def __init__(self, log_path, work_folder, config, logfile = '', seed = 0, 
-                 suffix = True):
+    def __init__(self, log_path, work_folder, config, logfile = '', seed = 0, suffix = True,**kwargs):
         self.log_path = log_path
         self.work_folder = work_folder
-        self.config = config
+        self.config = config[0]
         self.logfile = logfile
         self.seed = seed
 
@@ -727,7 +704,6 @@ class CityFlowEnv:
             'adj_mat': self.adj_mat
         }
 
-
     def _set_action_space_one(self, i):
         return self.list_intersection[i].action_space
 
@@ -772,25 +748,6 @@ class CityFlowEnv:
 
         state = self._collect_state()
         return state, {'average_time': 0.0, 'average_delay': 0.0}
-    
-    # STFGNN
-    def _renew_in_lane_flow(self):
-        lane_vehicles=self.eng.get_lane_vehicles()
-        for inter in self.list_intersection:
-            for i,ln in enumerate(inter.observation_space['TSlane']): 
-                for j,k in enumerate(ln):
-                    inter.saved_lane_flow[i][j]=set(lane_vehicles[k])-inter.saved_lane_flow[i][j]
-
-    # STFGNN
-    def _add_in_lane_flow(self):
-        lane_vehicles=self.eng.get_lane_vehicles()
-        for inter in self.list_intersection:
-            for i,ln in enumerate(inter.observation_space['TSlane']): 
-                for j,k in enumerate(ln):
-                    inter.saved_lane_flow[i][j]=set(lane_vehicles[k])-inter.saved_lane_flow[i][j]
-                    # for x in lane_vehicles[k]:
-                    #     inter.saved_lane_flow[i][j].add(x) 
-
 
     def _collect_state(self):
         res = []
@@ -823,24 +780,13 @@ class CityFlowEnv:
         for i in range(self.config['MIN_ACTION_TIME']):
             if i == 0:
                 self.step_lane_vehicles()
-            # STFGNN
-            if i==0:
-                self._renew_in_lane_flow()
-            else:
-                self._add_in_lane_flow()
-
             self._inner_step(action, self.config['ACTION_PATTERN'])
             state = self._collect_state()
             all_reward += self._collect_reward()
             done = self._is_done()
 
-        # STFGNN
-        lane_vehicles=self.eng.get_lane_vehicles()
-        for j,inter in enumerate(self.list_intersection):
-            state[j]["Inlaneflow"]=[[len(ls) for ls in ln] for ln in inter.saved_lane_flow]
-            state[j]["TSlaneflow"]=[[len(lane_vehicles[k]) for k in ln] for ln in inter.observation_space['TSlane']]
-
         all_reward /= self.config['MIN_ACTION_TIME']
+
         infos = {
             'average_time': self._average_time(), 
             'average_delay': self._average_delay(),
@@ -891,7 +837,7 @@ class CityFlowEnv:
     def _inner_step(self, actions, pattern):
         for action, inter in zip(actions, self.list_intersection):
             inter.update_old()
-            inter.act(action, pattern)
+            # inter.act(action, pattern)
         for i in range(int(1 / self.config['INTERVAL'])):
             # self.flow_generator.check(self.eng.get_current_time())
             self.eng.next_step()  # catch errors and report to above
@@ -911,3 +857,46 @@ class CityFlowEnv:
 
     def get_default_action(self):
         return [x.get_default_action() for x in self.list_intersection]
+
+
+
+
+def get_args(args):
+    args = vars(parse_args(args))
+    args = loginit(args)
+    log(args, level = 'ALL')
+    env_args = {
+                'number': args["threads"], 
+                'log_path': args["log_folder"],
+                'work_folder': '.', 
+                'config': args["train_cityflow_config"], 
+                'log': args["cityflow_log"]
+            }
+    # env_args['log_path'] = args["log_folder"] + '/get_data/' 
+
+    return env_args
+
+import time
+if __name__=="__main__":
+    argv=["main.py", "--config", "configs/main/GCNUniLight.yml", "--cityflow-config", "configs/cityflow/SH1.yml"]
+    env_args=get_args(argv)
+    env=CityFlowEnv(**env_args)
+    action=[0 for _ in range(len(env.list_intersection))]
+    epochs=100
+    env.reset()
+
+    t0=time.time()
+    for i in range(epochs) :
+        env.step(action)
+    t1=time.time()
+
+    # logging...
+    logging.basicConfig(filename='./cityflow.log', level=logging.DEBUG, format='%(asctime)s - %(levelname)s - %(message)s')
+    logging.info(f'''使用原始的cityflow收集数据 epochs:{epochs},time_span:{t1-t0:.2f}s,evrage time span every epoch:{(t1-t0)/epochs:.2f}s''')
+   
+
+    
+
+
+
+            

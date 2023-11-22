@@ -2,11 +2,12 @@ import time
 import os
 import sys
 import socket
-import shutil
-
-from mainfunc import *
 from utils.arguments import parse_args
 from utils.log import log, loginit, logexit
+from mainfunc.GCNDQNMain import *
+from mainfunc.DeterminedMain import *
+from mainfunc.MainFuncBase import *
+
 
 
 def main_wrapper(args):
@@ -50,34 +51,34 @@ def main_wrapper(args):
                 print('[ERROR] not in linux, cannot remove log folder! please '
                       'remove it manually.')
 
-    try:
-        if M.lower() == 'dqn':
-            main = DQNMain(**args)
-        elif M.lower() == 'determined':
-            main = DeterminedMain(**args)
-        elif M in globals():
+    # try:
+    if M.lower() == 'dqn':
+        main = GCNDQNMain(**args)
+    elif M.lower() == 'determined':
+        main = DeterminedMain(**args)
+    elif M in globals():
+        main = globals()[M](**args)
+    else:
+        M = M + 'Main'
+        if M in globals():
             main = globals()[M](**args)
         else:
-            M = M + 'Main'
-            if M in globals():
-                main = globals()[M](**args)
-            else:
-                raise NotImplementedError('unknown main ' + M[:-4])
-        main.main()
-    except (Exception, KeyboardInterrupt) as e:
-        try:
-            del main
-        except Exception:
-            pass
-        time.sleep(0.3)
-        log('some error cooured! will show below.', level = 'ERROR')
-        cleancheck(args)
-        raise e
+            raise NotImplementedError('unknown main ' + M[:-4])
+    main.main()
+    # except (Exception, KeyboardInterrupt) as e:
+    #     try:
+    #         del main
+    #     except Exception:
+    #         pass
+    #     time.sleep(0.3)
+    #     log('some error cooured! will show below.', level = 'ERROR')
+    #     cleancheck(args)
+    #     raise e
     del main
     time.sleep(0.3)
     cleancheck(args)
 
 
 if __name__ == "__main__":
-    argv=["main.py", "--config", "configs/main/UniLight.yml", "--cityflow-config", "configs/cityflow/SH1.yml"]
+    argv=["main.py", "--config", "configs/main/GCNUniLight.yml", "--cityflow-config", "configs/cityflow/SH1.yml"]
     main_wrapper(argv)

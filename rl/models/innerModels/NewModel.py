@@ -173,7 +173,7 @@ class NewModel(InnerModelBase):
         green = state['TSgreen']
         phase = state['TSphase']
         predict = state['predict']
-        phase_s = nn.functional.one_hot(phase, num_classes = len(self.phases))
+        phase_s = nn.functional.one_hot((phase), num_classes = len(self.phases))
         phase_s = phase_s.float().unsqueeze(-1)  # [BATCH, PHASE, 1]
 
         x = torch.stack((flow, green, predict), dim = -1)

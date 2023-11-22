@@ -10,7 +10,7 @@ evaluate-interval: 12000
 dqn-replay-size: 8000
 dqn-hidden-size: 32
 #learning-rate: 0.1
-dqn-batch-size: 30
+dqn-batch-size: 32
 gamma: 0.8
 dqn-initial-eps: 0.9
 dqn-final-eps: 0.02

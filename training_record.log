@@ -1,0 +1,160 @@
+[INFO ] epoch    0, frame    2400: time=204.592, eps=0.87, reward=-22229.218661, result=4767.224981
+[INFO ] epoch    1, frame    4800: time=297.602, eps=0.84, reward=-23951.842169, result=5148.252499
+[INFO ] epoch    2, frame    7200: time=308.798, eps=0.81, reward=-22795.737050, result=4895.114418
+[INFO ] replay full, start training
+[INFO ] epoch    3, frame    9600: time=546.801, eps=0.78, reward=-22626.076796, result=4792.122440
+[INFO ] epoch    4, frame   12000: start evaluate
+[INFO ] evaluate result: 6309.067001299691
+[INFO ] best result updated: 6309.067001299691
+[INFO ] epoch    4, frame   12000: time=860.164, eps=0.75, reward=-22701.647710, result=5015.225474
+[INFO ] epoch    5, frame   14400: time=587.199, eps=0.72, reward=-21496.748814, result=4689.260028
+[INFO ] epoch    6, frame   16800: time=605.106, eps=0.69, reward=-21561.006924, result=4592.383454
+[INFO ] epoch    7, frame   19200: time=562.377, eps=0.67, reward=-19563.281300, result=4259.028593
+[INFO ] epoch    8, frame   21600: time=565.589, eps=0.64, reward=-21032.439323, result=4657.568772
+[INFO ] epoch    9, frame   24000: start evaluate
+[INFO ] evaluate result: 3369.838524626899
+[INFO ] best result updated: 3369.838524626899
+[INFO ] epoch    9, frame   24000: time=842.154, eps=0.61, reward=-21917.646535, result=4823.513916
+[INFO ] epoch   10, frame   26400: time=575.459, eps=0.58, reward=-19649.972353, result=4271.953839
+[INFO ] epoch   11, frame   28800: time=562.676, eps=0.55, reward=-18902.128996, result=4128.073903
+[INFO ] epoch   12, frame   31200: time=564.684, eps=0.52, reward=-20263.438546, result=4342.908798
+[INFO ] epoch   13, frame   33600: time=569.114, eps=0.49, reward=-19602.414979, result=4157.094922
+[INFO ] epoch   14, frame   36000: start evaluate
+[INFO ] evaluate result: 1225.8269618607987
+[INFO ] best result updated: 1225.8269618607987
+[INFO ] epoch   14, frame   36000: time=823.805, eps=0.46, reward=-21365.873477, result=4720.841169
+[INFO ] epoch   15, frame   38400: time=575.747, eps=0.43, reward=-21442.658020, result=4698.410613
+[INFO ] epoch   16, frame   40800: time=559.994, eps=0.40, reward=-16252.487598, result=3556.849818
+[INFO ] epoch   17, frame   43200: time=551.813, eps=0.37, reward=-16428.275434, result=3677.058755
+[INFO ] epoch   18, frame   45600: time=534.736, eps=0.34, reward=-13139.426667, result=2837.285663
+[INFO ] epoch   19, frame   48000: start evaluate
+[INFO ] evaluate result: 2221.9728857616637
+[INFO ] epoch   19, frame   48000: time=723.430, eps=0.31, reward=-15365.916079, result=3441.065164
+[INFO ] epoch   20, frame   50400: time=531.147, eps=0.28, reward=-11407.990476, result=2645.899162
+[INFO ] epoch   21, frame   52800: time=522.272, eps=0.25, reward=-10981.000448, result=2572.906960
+[INFO ] epoch   22, frame   55200: time=535.886, eps=0.23, reward=-14081.549436, result=3251.405638
+[INFO ] epoch   23, frame   57600: time=541.016, eps=0.20, reward=-13835.838963, result=3157.638103
+[INFO ] epoch   24, frame   60000: start evaluate
+[INFO ] evaluate result: 3157.4312091063907
+[INFO ] epoch   24, frame   60000: time=736.814, eps=0.17, reward=-12759.713855, result=2822.837852
+[INFO ] epoch   25, frame   62400: time=511.855, eps=0.14, reward=-9081.366541, result=2184.228656
+[INFO ] epoch   26, frame   64800: time=517.193, eps=0.11, reward=-9905.123648, result=2151.208085
+[INFO ] epoch   27, frame   67200: time=548.864, eps=0.08, reward=-18629.119124, result=3984.992740
+[INFO ] epoch   28, frame   69600: time=550.997, eps=0.05, reward=-16881.636992, result=3764.089096
+[INFO ] epoch   29, frame   72000: start evaluate
+[INFO ] evaluate result: 3162.295970958634
+[INFO ] epoch   29, frame   72000: time=760.675, eps=0.02, reward=-15747.659012, result=3527.613723
+[INFO ] epoch   30, frame   74400: time=553.929, eps=0.02, reward=-18534.287358, result=4094.841483
+[INFO ] epoch   31, frame   76800: time=532.004, eps=0.02, reward=-11996.119203, result=2724.929234
+[INFO ] epoch   32, frame   79200: time=519.822, eps=0.02, reward=-11492.569934, result=2523.801102
+[INFO ] epoch   33, frame   81600: time=528.823, eps=0.02, reward=-13343.457558, result=2981.265944
+[INFO ] epoch   34, frame   84000: start evaluate
+[INFO ] evaluate result: 2448.1091740241113
+[INFO ] epoch   34, frame   84000: time=728.340, eps=0.02, reward=-9407.602710, result=2210.776095
+[INFO ] epoch   35, frame   86400: time=519.561, eps=0.02, reward=-12162.008076, result=2780.763680
+[INFO ] epoch   36, frame   88800: time=517.931, eps=0.02, reward=-10970.011963, result=2533.751266
+[INFO ] epoch   37, frame   91200: time=525.354, eps=0.02, reward=-13417.376786, result=3090.536369
+[INFO ] epoch   38, frame   93600: time=535.671, eps=0.02, reward=-13066.441512, result=2963.979519
+[INFO ] epoch   39, frame   96000: start evaluate
+[INFO ] evaluate result: 3107.3893246089724
+[INFO ] epoch   39, frame   96000: time=755.460, eps=0.02, reward=-13658.600855, result=3120.267736
+[INFO ] epoch   40, frame   98400: time=538.987, eps=0.02, reward=-13527.570997, result=3087.216779
+[INFO ] epoch   41, frame  100800: time=524.957, eps=0.02, reward=-11236.344355, result=2444.938690
+[INFO ] epoch   42, frame  103200: time=507.621, eps=0.02, reward=-8427.144562, result=1812.208623
+[INFO ] epoch   43, frame  105600: time=496.027, eps=0.02, reward=-8239.319134, result=1802.838569
+[INFO ] epoch   44, frame  108000: start evaluate
+[INFO ] evaluate result: 1526.442681724478
+[INFO ] epoch   44, frame  108000: time=666.560, eps=0.02, reward=-3727.217195, result=875.299709
+[INFO ] epoch   45, frame  110400: time=18476.169, eps=0.02, reward=-2186.914898, result=616.499619
+[INFO ] epoch   46, frame  112800: time=607.520, eps=0.02, reward=-1222.190963, result=345.651324
+[INFO ] epoch   47, frame  115200: time=530.040, eps=0.02, reward=-1498.529901, result=380.002778
+[INFO ] epoch   48, frame  117600: time=507.807, eps=0.02, reward=-931.510404, result=239.184422
+[INFO ] epoch   49, frame  120000: start evaluate
+[INFO ] evaluate result: 1692.9204051449829
+[INFO ] epoch   49, frame  120000: time=721.684, eps=0.02, reward=-1102.533115, result=303.283544
+[INFO ] epoch   50, frame  122400: time=514.454, eps=0.02, reward=-929.474266, result=253.074979
+[INFO ] epoch   51, frame  124800: time=561.396, eps=0.02, reward=-1434.870202, result=377.523393
+[INFO ] epoch   52, frame  127200: time=714.487, eps=0.02, reward=-2521.365847, result=636.821637
+[INFO ] epoch   53, frame  129600: time=687.644, eps=0.02, reward=-1314.732588, result=350.983328
+[INFO ] epoch   54, frame  132000: start evaluate
+[INFO ] evaluate result: 265.7149195536235
+[INFO ] best result updated: 265.7149195536235
+[INFO ] epoch   54, frame  132000: time=1056.439, eps=0.02, reward=-1572.579069, result=370.997670
+[INFO ] epoch   55, frame  134400: time=560.484, eps=0.02, reward=-724.294415, result=210.367588
+[INFO ] epoch   56, frame  136800: time=462.859, eps=0.02, reward=-633.011507, result=184.847898
+[INFO ] epoch   57, frame  139200: time=429.181, eps=0.02, reward=-632.587105, result=184.459149
+[INFO ] epoch   58, frame  141600: time=418.398, eps=0.02, reward=-598.599393, result=173.594506
+[INFO ] epoch   59, frame  144000: start evaluate
+[INFO ] evaluate result: 577.5904629588132
+[INFO ] epoch   59, frame  144000: time=557.468, eps=0.02, reward=-579.589767, result=168.104872
+[INFO ] epoch   60, frame  146400: time=414.618, eps=0.02, reward=-551.055259, result=160.660751
+[INFO ] epoch   61, frame  148800: time=416.702, eps=0.02, reward=-574.480555, result=167.755153
+[INFO ] epoch   62, frame  151200: time=421.750, eps=0.02, reward=-760.350069, result=227.766256
+[INFO ] epoch   63, frame  153600: time=420.212, eps=0.02, reward=-615.888266, result=173.521601
+[INFO ] epoch   64, frame  156000: start evaluate
+[INFO ] evaluate result: 228.11208210092317
+[INFO ] best result updated: 228.11208210092317
+[INFO ] epoch   64, frame  156000: time=550.876, eps=0.02, reward=-592.980650, result=170.912436
+[INFO ] epoch   65, frame  158400: time=413.657, eps=0.02, reward=-595.699544, result=173.927313
+[INFO ] epoch   66, frame  160800: time=416.483, eps=0.02, reward=-593.304182, result=171.738125
+[INFO ] epoch   67, frame  163200: time=417.720, eps=0.02, reward=-719.656546, result=195.886255
+[INFO ] epoch   68, frame  165600: time=433.785, eps=0.02, reward=-722.715129, result=208.437324
+[INFO ] epoch   69, frame  168000: start evaluate
+[INFO ] evaluate result: 188.78807026978578
+[INFO ] best result updated: 188.78807026978578
+[INFO ] epoch   69, frame  168000: time=567.366, eps=0.02, reward=-709.268649, result=195.142518
+[INFO ] epoch   70, frame  170400: time=421.713, eps=0.02, reward=-572.889002, result=167.182075
+[INFO ] epoch   71, frame  172800: time=432.873, eps=0.02, reward=-876.446976, result=225.547056
+[INFO ] epoch   72, frame  175200: time=434.874, eps=0.02, reward=-688.243437, result=194.678932
+[INFO ] epoch   73, frame  177600: time=445.690, eps=0.02, reward=-781.782231, result=218.863264
+[INFO ] epoch   74, frame  180000: start evaluate
+[INFO ] evaluate result: 164.17639940841661
+[INFO ] best result updated: 164.17639940841661
+[INFO ] epoch   74, frame  180000: time=553.328, eps=0.02, reward=-608.673247, result=175.111505
+[INFO ] epoch   75, frame  182400: time=417.416, eps=0.02, reward=-634.347809, result=187.094295
+[INFO ] epoch   76, frame  184800: time=423.007, eps=0.02, reward=-1140.643795, result=261.042348
+[INFO ] epoch   77, frame  187200: time=420.487, eps=0.02, reward=-686.557171, result=192.119964
+[INFO ] epoch   78, frame  189600: time=418.942, eps=0.02, reward=-641.759799, result=183.654941
+[INFO ] epoch   79, frame  192000: start evaluate
+[INFO ] evaluate result: 219.5255893161244
+[INFO ] epoch   79, frame  192000: time=531.106, eps=0.02, reward=-708.094461, result=199.943536
+[INFO ] epoch   80, frame  194400: time=421.242, eps=0.02, reward=-666.726145, result=185.937032
+[INFO ] epoch   81, frame  196800: time=433.415, eps=0.02, reward=-1379.990182, result=317.077171
+[INFO ] epoch   82, frame  199200: time=434.671, eps=0.02, reward=-674.460325, result=183.647979
+[INFO ] epoch   83, frame  201600: time=425.085, eps=0.02, reward=-994.775003, result=252.195079
+[INFO ] epoch   84, frame  204000: start evaluate
+[INFO ] evaluate result: 167.29428635447007
+[INFO ] epoch   84, frame  204000: time=549.901, eps=0.02, reward=-605.860889, result=175.936500
+[INFO ] epoch   85, frame  206400: time=444.370, eps=0.02, reward=-602.311013, result=174.855824
+[INFO ] epoch   86, frame  208800: time=439.958, eps=0.02, reward=-676.167562, result=193.082060
+[INFO ] epoch   87, frame  211200: time=440.238, eps=0.02, reward=-607.143215, result=178.278672
+[INFO ] epoch   88, frame  213600: time=548.648, eps=0.02, reward=-14085.464183, result=3151.176220
+[INFO ] epoch   89, frame  216000: start evaluate
+[INFO ] evaluate result: 4701.36055214449
+[INFO ] epoch   89, frame  216000: time=848.622, eps=0.02, reward=-22253.005542, result=4651.384305
+[INFO ] epoch   90, frame  218400: time=567.065, eps=0.02, reward=-17476.805941, result=3784.812531
+[INFO ] epoch   91, frame  220800: time=574.028, eps=0.02, reward=-22276.475648, result=4757.412585
+[INFO ] epoch   92, frame  223200: time=569.171, eps=0.02, reward=-18660.615789, result=4092.490835
+[INFO ] epoch   93, frame  225600: time=567.527, eps=0.02, reward=-21103.003979, result=4490.379796
+[INFO ] epoch   94, frame  228000: start evaluate
+[INFO ] evaluate result: 2681.3004526509208
+[INFO ] epoch   94, frame  228000: time=784.864, eps=0.02, reward=-17130.585890, result=3627.234706
+[INFO ] epoch   95, frame  230400: time=555.397, eps=0.02, reward=-12729.478777, result=2482.967060
+[INFO ] epoch   96, frame  232800: time=620.524, eps=0.02, reward=-16374.792959, result=3515.001658
+[INFO ] epoch   97, frame  235200: time=559.695, eps=0.02, reward=-12667.167416, result=2823.985030
+[INFO ] epoch   98, frame  237600: time=558.285, eps=0.02, reward=-18763.853473, result=4072.185632
+[INFO ] epoch   99, frame  240000: start evaluate
+[INFO ] evaluate result: 451.411113600717
+[INFO ] epoch   99, frame  240000: time=705.739, eps=0.02, reward=-12277.702246, result=2764.459015
+[INFO ] use best model to evaluate 10 times
+[INFO ] evaluate round 0 result: 178.4773002285663
+[INFO ] evaluate round 1 result: 309.7501904719222
+[INFO ] evaluate round 2 result: 164.67489804150048
+[INFO ] evaluate round 3 result: 698.4430203898722
+[INFO ] evaluate round 4 result: 2345.5599426343388
+[INFO ] evaluate round 5 result: 293.8877537303401
+[INFO ] evaluate round 6 result: 310.47199067849783
+[INFO ] evaluate round 7 result: 645.5510240666875
+[INFO ] evaluate round 8 result: 172.37789629364048
+[INFO ] evaluate round 9 result: 174.3840638164381
+[INFO ] result: 529.3578080351804 632.5991852262466

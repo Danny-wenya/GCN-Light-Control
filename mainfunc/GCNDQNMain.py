@@ -1,16 +1,19 @@
+from .DQNMain import *
+from envs.GCNSubprocVecEnv import getGCNCityFlowEnvVec
 from .MainFuncBase import *
 
-from rl.storage import ReplayBuffer, CityFlowBuffer
+from rl.GCNstorage import GCNReplayBuffer, CityFlowBuffer
 from rl.models import *
 from rl.agents import *
 from rl.multiAgent import *
+import pickle
 
 
-class DQNMain(MainFuncBase):
+class GCNDQNMain(DQNMain):
     def __init__(self, env, agent, multi_agent, model, dueling_dqn, 
                  dqn_initial_eps, dqn_final_eps, dqn_explore_len_frac, 
                  n_frames, dqn_replay_size, dqn_batch_size, render_steps, 
-                 model_save_path, n_steps,
+                 model_save_path, n_steps,strides,
                  threads, seed, no_cuda, evaluate_round, evaluate_interval, 
                  development, save_interval,
                  # Specific args
@@ -33,7 +36,7 @@ class DQNMain(MainFuncBase):
                 'logpath': log_folder,
                 'workpath': work_folder, 
                 'config': train_cityflow_config, 
-                'log': cityflow_log
+                'log': cityflow_log,
             }
             env_args['logpath'] = log_folder + '/train_env/' 
             self.train_env_args = env_args
@@ -50,6 +53,17 @@ class DQNMain(MainFuncBase):
                                       'not implemented')
         log(self.env.observation_space, self.env.action_space, level = 'TRACE')
         self._init_TXSW(**kwargs)
+
+        kwargs_buffer={'n_steps':n_steps,
+                 'maxlen':dqn_replay_size, 
+                 'batch_size':dqn_batch_size, 
+                 'seed':self.randint(), 
+                 'buffer_instance':CityFlowBuffer(dqn_replay_size, self.env.observation_space['intersections'],self.env.action_space),
+                 'adj':self.env.adj,
+                 'strides':strides
+
+                }
+        self.replay = cuda(GCNReplayBuffer(**kwargs_buffer))
 
         if model == 'basic':
             model = 'DQNNaiveFC'
@@ -75,11 +89,12 @@ class DQNMain(MainFuncBase):
             'observation': self.env.observation_space['intersections'], 
             'adj_mat': self.env.observation_space['adj_mat'],
             'virtual_intersection_out_lines': self.env.observation_space[
-                'virtual_intersection_out_lines'
-            ],
+                'virtual_intersection_out_lines'],
             'action': self.env.action_space,
             'innerModel': inner_model, 
-            'TXSW': self.TXSW
+            'adj':self.env.adj,
+            'adj_mx':self.replay.adj_mx,
+            'TXSW': self.TXSW,
         }
         if agent.lower() == 'dqn':
             agent = 'DQNAgent'
@@ -101,6 +116,7 @@ class DQNMain(MainFuncBase):
 
         self.agent.log_model_structure()
 
+
         self.THREADS = threads
         self.N_STEPS = n_steps
 
@@ -117,18 +133,7 @@ class DQNMain(MainFuncBase):
 
         if test_round > 0:
             return
-
-        self.replay = cuda(ReplayBuffer(
-                               n_steps, 
-                               dqn_replay_size, 
-                               dqn_batch_size, 
-                               self.randint(), 
-                               CityFlowBuffer(
-                                   dqn_replay_size, 
-                                   self.env.observation_space['intersections'],
-                                   self.env.action_space
-                               )
-                      ))
+        
 
         self.EPS = [dqn_initial_eps, dqn_final_eps, dqn_explore_len_frac]
         self.EPS[2] = (self.EPS[0] - self.EPS[1]) / (n_frames * self.EPS[2])
@@ -161,74 +166,49 @@ class DQNMain(MainFuncBase):
         else:
             os.makedirs(self.model_folder)
 
-        log('DQNMain init over')
+        log('GCNDQNMain init over')
+
 
     def get_env(self, args):
         args = args.copy()
         args['logpath'] += str(len(self.envs)) + '/'
-        self.envs.append(getCityFlowEnvVec(**args, seed = self.randint()))
+        self.envs.append(getGCNCityFlowEnvVec(**args, seed = self.randint()))
         return self.envs[-1]
 
-    def randint(self, k = 2 ** 31):
-        return self.randomstate.randint(k)
 
-    def eps(self):
-        return max(self.EPS[0] - self.FRAME * self.EPS[2], self.EPS[1])
-
-    def save(self, savepath, result = None, reward = None, eval = None):
-        save_data = {
-            'epoch': self.epoch,
-            'test_result': result,
-            'test_reward': reward,
-            'eval_result': eval,
-            'replay_count': self.env.replay_count(),
-            'state_dict': self.agent.state_dict()
-        }
-        torch.save(save_data, savepath)
-
-    def sampling(self,epoch):
-        while True:
-            # try:
-                return self.real_sampling(epoch)
-            # except Exception as e:
-            #     # raise e
-            #     if self.DEV:
-            #         print(e)
-            #         raise e
-            #     log('got error while training! message logged , generate new '
-            #         'env and re-run.', level = 'WARN')
-            #     self.env = self.get_env(self.train_env_args)
-            #     log(e, level = 'TRACE')
-
-    def real_sampling(self,epoch):
+    def real_sampling(self):
         start_time = time.time()
         replay_full_before = self.replay.full
-        state, infos = self.env.reset()
-        self.replay.reset(state)
-        action = self.agent.action(state, eps = self.eps(), get = True)
-        tot_reward = np.zeros(self.THREADS, dtype=float)
+        state, infos = self.env.reset()  #state [[dict]*6], state["input"]:ndarray[10,12,3]
+        self.replay.reset(state[0])
+        action = self.agent.action(state,eps = self.eps(), get = True)    # 随机动作
+        tot_reward = np.zeros(self.THREADS, dtype=float) # array(1,)
         eval_res = None
         for ite in range(self.SIMULATE_TIME):
             self.FRAME += self.THREADS
             next_s, reward, ist, infos = self.env.step(action)
             tot_reward += np.sum(reward, axis = -1)
-            next_action = self.agent.action(next_s, eps = self.eps(), 
-                                            get = True)
+            next_action = self.agent.action(next_s,eps = self.eps(), get = True)  
 
             assert(ist.all() == ist.any())
-            # assert(ist.all() == (ite == self.SIMULATE_TIME - 1))
-            # if ite == self.SIMULATE_TIME - 1:
-            #     assert(ist.all())
-
-            self.replay.append(action, reward, next_s, ist,epoch)
+            self.replay.append(action, reward, next_s[0], ist)
             if self.replay.full and not replay_full_before:
+                with open('./buffer_1w.pkl','wb') as f:
+                    pickle.dump(self.replay.buffer,f)
                 log('replay full, start training')
                 replay_full_before = True
-            if self.replay.full:
-                for _ in range(self.THREADS):
-                    samples = self.replay.sample()
-                    self.agent.update_policy(samples, self.FRAME)
 
+            if self.replay.full:
+                self.agent.eps_flag=True
+                for _ in range(self.THREADS):
+                    samples = self.replay.sample()   
+                    if self.replay.adjmx_change:
+                        self.agent.agent.model_old.inner.adj_mx=self.replay.adj_mx
+                        self.agent.agent.model_update.inner.adj_mx=self.replay.adj_mx
+                        self.agent.agent.BEST_MODEL.inner.adj_mx=self.replay.adj_mx
+                        self.replay.reset_adj_mx()
+                    self.agent.update_policy(samples, self.FRAME)  
+                    print(f"training..{ite}")
             action = next_action
             state = next_s
 
@@ -261,72 +241,3 @@ class DQNMain(MainFuncBase):
         if self.model_folder != '':
             self.save(self.model_folder + '%04d.pt' % self.epoch,
                       result, tot_reward, eval_res)
-
-    def evaluate(self, model):
-        while True:
-            # try:
-                return self.real_evaluate(model)
-            # except Exception as e:
-            #     # print(e)
-            #     # raise e
-            #     if self.DEV:
-            #         print(e)
-            #         raise e
-            #     log('got error while evaluating! message logged, generate new '
-            #         'env and re-run.', level = 'WARN')
-            #     log(e, level = 'TRACE')
-            #     self.test_env = self.get_env(self.test_env_args)
-
-
-    def real_evaluate(self, model_name):
-        with torch.no_grad():
-            state, infos = self.test_env.reset()
-            action = self.agent.action(state, model_name = model_name, 
-                                       evaluate = True)
-            tot_reward = np.zeros(self.THREADS, dtype=float)
-            for ite in range(self.SIMULATE_TIME):
-                next_s, reward, ist, infos = self.test_env.step(action)
-                tot_reward += reward.sum(axis=1)
-                next_action = self.agent.action(next_s, 
-                                                model_name = model_name,
-                                                evaluate = True)
-                action = next_action
-                state = next_s
-            log(infos, level = 'TRACE')
-            eval_res = np.stack([x['average_time'] for x in infos]).mean()
-            self.TXSW.add_scalar('evaluate', eval_res, self.FRAME)
-            return eval_res
-
-    def main(self):
-        if self.test_round != 0:
-            # test mode
-            log('test mode, will test %d times' % self.test_round)
-            res = []
-            for i in range(self.test_round):
-                start_time = time.time()
-                one = self.evaluate('BEST')
-                log('test round %4d: time=%.3f result=%.3f' 
-                    % (i, time.time() - start_time, one))
-                res.append(one)
-            res = np.array(res)
-            log('result mean: %.3f' % res.mean())
-            log('result max: %.3f' % res.max())
-            log('result min: %.3f' % res.min())
-            log('result std: %.3f' % res.std())
-            log('result:', res.mean(), res.std())
-            return
-
-        while self.epoch < self.TOTAL_EPOCH:
-            self.sampling(self.epoch)
-            self.epoch += 1
-        final_result = []
-        log('use best model to evaluate %d times' % self.EVAL_ROUND)
-        for num in range(self.EVAL_ROUND):
-            eval = self.evaluate('BEST')
-            log('evaluate round', num, 'result:', eval)
-            final_result += [eval]
-        final_result = np.array(final_result)
-        log('result:', final_result.mean(), final_result.std())
-
-    def __del__(self):
-        self.TXSW.close()
