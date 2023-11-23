@@ -80,4 +80,5 @@ def main_wrapper(args):
 
 if __name__ == "__main__":
     argv=["main.py", "--config", "configs/main/UniLight.yml", "--cityflow-config", "configs/cityflow/SH1.yml"]
+    # argv=sys.argv
     main_wrapper(argv)

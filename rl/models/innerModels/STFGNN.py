@@ -383,7 +383,7 @@ class STFGNN(nn.Module):
             self.mask = None
 
     def forward(self, x):
-        x=self.scaler.transform(x)
+        # x=self.scaler.transform(x)
         x = torch.relu(self.First_FC(x))  
         for model in self.STSGCLS:
             x = model(x, self.mask)
@@ -394,7 +394,7 @@ class STFGNN(nn.Module):
             need_concat_flow.append(out_flow)
             need_concat_phase.append(out_phase)
         out1 = torch.cat(need_concat_flow, dim=1)
-        out1=self.scaler.inverse_transform(out1)
+        # out1=self.scaler.inverse_transform(out1)
         out2=torch.cat(need_concat_phase, dim=1)  
         del need_concat_flow,need_concat_phase
 
