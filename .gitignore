@@ -1,0 +1,14 @@
+*.swp
+.ipynb_checkpoints/
+__pycache__/
+data
+logs
+runs
+model
+record
+.vscode/
+/gridsearch
+/test4times.yml
+*.pyc
+results
+wandb
