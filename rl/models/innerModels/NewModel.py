@@ -1,5 +1,5 @@
 from .InnerModelBase import *
-from ..graphnn.graphnn import GCN
+from ..graphnn.graphnn import GCN,GCN2
 
 
 """lane2embedding, predict phase
@@ -54,8 +54,19 @@ class VolumePredict(nn.Module):
     def __init__(self, NM_road_predict_hidden, graph_hidden_dim,graph_output_dim,num_heads,num_nodes,**kwargs):
         super().__init__()
         self.hidden = NM_road_predict_hidden
-        # self.GAT=GAT(self.hidden, gat_hidden_dim, gat_output_dim,num_nodes, num_heads)
+        
         self.GCN=GCN(self.hidden, graph_hidden_dim, graph_output_dim)
+        
+        # nfeat=32
+        # nhid=64
+        # nclass=1
+        # n_layers=3
+        # activation=nn.ELU()
+        # dropout=0.3
+        # nodes=72
+        # self.GCN=GCN2(nfeat, nhid, nclass, n_layers, activation, dropout)
+
+        # self.GAT=GAT(self.hidden, gat_hidden_dim, gat_output_dim,num_nodes, num_heads)
 
     def forward(self,input_features, adjacency_matrix):
         """calculate predicts for roadout
