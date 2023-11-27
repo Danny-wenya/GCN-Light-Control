@@ -16,3 +16,4 @@ num_nodes: 72
 num_heads: 3
 graph_hidden_dim: 64
 graph_output_dim: 1
+best_model: ./logs/best_model/best.pt

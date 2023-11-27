@@ -166,11 +166,13 @@ def parse_args(input_args = sys.argv):
     parser.add_argument('-DDu', '--dueling-dqn', action='store_true', 
                         default=False)
     
-    # gat
+    # gcn
     parser.add_argument('--num_nodes', type=int, default=72)
     parser.add_argument('--num_heads', type=int, default=3)
     parser.add_argument('--graph_hidden_dim', type=int, default=64)
     parser.add_argument('--graph_output_dim', type=int, default=1)
+    parser.add_argument('--best_model', type=str, default='./logs/best_model/best.pt')
+
 
     args = parser.parse_args(input_args[1:])
     # if config file is set, read it and parse it before cmd arguments

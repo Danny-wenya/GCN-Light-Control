@@ -41,9 +41,16 @@ class DQNAgent(AgentBase):
         self.BEST_MODEL = cuda(wrapperModel(
             **model_args, 
             seed = self.randint(), **kwargs))
+
+        # if  best_model:
+        #     self.model_update.load_state_dict(torch.load(best_model))
+        #     self.BEST_MODEL.load_state_dict(torch.load(best_model))
+        #     log('loaded best model')
+
         self.model_old.eval()  # a.k.a target net
         self.model_update.train()
         self.BEST_MODEL.eval()
+
         self.GAMMA = gamma
         self.UPDATE = dqn_net_update_freq
         self.LR = learning_rate

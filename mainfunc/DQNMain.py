@@ -17,7 +17,7 @@ class DQNMain(MainFuncBase):
                  log_folder, work_folder, simulate_time, cityflow_config, 
                  cityflow_log, preload_model_file, test_round, 
                  dqn_split_model, clean_logs, 
-                 train_cityflow_config, wrapper_model,
+                 train_cityflow_config, wrapper_model,best_model,
                  **kwargs):
         self.SEED = seed
         self.randomstate = np.random.RandomState(seed)
@@ -79,7 +79,8 @@ class DQNMain(MainFuncBase):
             ],
             'action': self.env.action_space,
             'innerModel': inner_model, 
-            'TXSW': self.TXSW
+            'TXSW': self.TXSW,
+            
         }
         if agent.lower() == 'dqn':
             agent = 'DQNAgent'
@@ -96,11 +97,11 @@ class DQNMain(MainFuncBase):
                                      wrapperModel = wrapperModel,
                                      dueling_dqn = dueling_dqn,
                                      seed = self.randint(), 
+                                    #  best_model=best_model,
                                      **model_args, 
                                      **kwargs))
 
         self.agent.log_model_structure()
-
         self.THREADS = threads
         self.N_STEPS = n_steps
 
@@ -114,6 +115,17 @@ class DQNMain(MainFuncBase):
             self.env.replay_count(self.model_file['replay_count'])
             self.SIMULATE_TIME = simulate_time
             self.FRAME = self.epoch * self.SIMULATE_TIME
+
+        if best_model != '':
+            self.model_file = torch.load(best_model,
+                                         map_location = 'cpu')
+            self.agent.load_state_dict(self.model_file['state_dict'])
+            print('best model loaded')
+            # self.epoch = self.model_file['epoch']
+            # self.env.replay_count(self.model_file['replay_count'])
+            # self.SIMULATE_TIME = simulate_time
+            # self.FRAME = self.epoch * self.SIMULATE_TIME
+
 
         if test_round > 0:
             return
@@ -155,6 +167,7 @@ class DQNMain(MainFuncBase):
             log('evaluate_interval can\'t be divided with threads! change '
                 'interval to %s.' % self.EVAL_INTERVAL, level = 'WARN')
         self.model_folder = os.path.join(log_folder, model_save_path) + '/'
+        self.common_model_folder=best_model
         if model_save_path == '':
             self.model_folder = ''
             log('model save path not set! will not save model', level = 'WARN')
@@ -243,6 +256,7 @@ class DQNMain(MainFuncBase):
                     if self.model_folder != '':
                         self.save(self.model_folder + 'best.pt',
                                   eval = eval_res)
+                        # self.save(self.common_model_folder,eval = eval_res)
                     log('best result updated:', eval_res)
 
         result = np.stack([x['average_time'] for x in infos]).mean()

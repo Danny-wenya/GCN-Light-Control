@@ -93,8 +93,6 @@ class NewModelMultiAgent(MALShare):
                 'RoadLinkDirection': cuda(torch.tensor(lanedirection)),
             })
 
-            
-
 
             # print(obs)
             # print(self.road_relation[-1])
