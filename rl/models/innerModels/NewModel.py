@@ -1,6 +1,6 @@
 from .InnerModelBase import *
-from ..graphnn.graphnn import GCN,GCN2
-
+from ..graphnn.graphnn import *
+from ..graphnn.graphsage import *
 
 """lane2embedding, predict phase
 """
@@ -54,9 +54,11 @@ class VolumePredict(nn.Module):
     def __init__(self, NM_road_predict_hidden, graph_hidden_dim,graph_output_dim,num_heads,num_nodes,**kwargs):
         super().__init__()
         self.hidden = NM_road_predict_hidden
-        
-        self.GCN=GCN(self.hidden, graph_hidden_dim, graph_output_dim)
-        
+        self.graph_hidden_dim=[graph_hidden_dim,2*graph_hidden_dim]
+        self.num_neighbors_list=[3,3]
+        self.graphsage=GraphSage(input_dim=self.hidden, hidden_dim=self.graph_hidden_dim,num_neighbors_list=self.num_neighbors_list)
+        self.output_layer=nn.Linear(2*graph_hidden_dim,1)
+
         # nfeat=32
         # nhid=64
         # nclass=1
@@ -65,15 +67,26 @@ class VolumePredict(nn.Module):
         # dropout=0.3
         # nodes=72
         # self.GCN=GCN2(nfeat, nhid, nclass, n_layers, activation, dropout)
-
+        # self.GCN=GCN(self.hidden, graph_hidden_dim, graph_output_dim)
         # self.GAT=GAT(self.hidden, gat_hidden_dim, gat_output_dim,num_nodes, num_heads)
 
-    def forward(self,input_features, adjacency_matrix):
+
+    def forward(self,input_features, adjacency_matrix,edge_index):
         """calculate predicts for roadout
         """
         input_features=cuda(input_features).float()
-        adjacency_matrix=cuda(adjacency_matrix).float()
-        v_p=self.GCN(input_features, adjacency_matrix)
+        input_features=torch.cat([input_features,torch.zeros_like(input_features[:,0,:]).unsqueeze(1)],dim=1)
+
+        # 使用GCN
+        # adjacency_matrix=cuda(adjacency_matrix).float()
+        # v_p=self.GCN(input_features, adjacency_matrix)
+
+        # 使用graphsage
+        nodes=np.array(list(edge_index.keys()))
+        batch_sampling_result = multihop_sampling(nodes, self.num_neighbors_list, edge_index)
+        batch_sampling_x = [cuda(input_features[:,idx,:]).float() for idx in batch_sampling_result]
+        v_emb=self.graphsage(batch_sampling_x)
+        v_p=self.output_layer(v_emb)
 
         return v_p
 
@@ -113,9 +126,7 @@ class NewModel(InnerModelBase):
                     one.append(num)
             self.not_phases.append(one)
         self.weights = [5, 1]
-
         self.shared_lane = lane_embedding_instance is not None
-
         self.phase_predict = PhasePredict(observation, **kwargs)
         self.volume_predict = VolumePredict(**kwargs)
 

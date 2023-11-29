@@ -31,16 +31,19 @@ class NewModelAgent(DQNAgent):
 
     def _init_adj(self):
         # 将所有路口的roalinks拉平排列,创建邻接矩阵
-        N=12*len(self.road_relation)
+        N=12*len(self.road_relation)+1
         adj=torch.zeros([N,N],dtype=torch.float)
+        edge_index=dict(zip(range(N),[[72,72,72] for _ in range(N)]))
         for num, rel in enumerate(self.road_relation):
             for ri, ri2rl in zip(rel['RoadsIn'], rel['RoadIn2RoadLink']):
                 from_i, from_r = ri
                 if from_i>=0:
                     up_rl=self.road_relation[from_i]['RoadOut2RoadLink'][from_r]
+                    adj[[num*12+i for i in ri2rl],up_rl]=1
                     for i in ri2rl:
-                        adj[num*12+i,up_rl]=1
+                        edge_index[int(num*12+i)]=up_rl
         self.adj=adj
+        self.edge_index=edge_index
 
 
     def named_modules(self, memo = None, prefix = ''):
@@ -113,9 +116,9 @@ class NewModelAgent(DQNAgent):
         batch_size=node_fea.shape[0]
         adj=self.adj.unsqueeze(0).repeat(batch_size,1,1)
         if isinstance(self.selected_model, torch.nn.ModuleList):
-            v_p=self.selected_model[model_index].inner.volume_predict(node_fea,adj) 
+            v_p=self.selected_model[model_index].inner.volume_predict(node_fea,adj,self.edge_index) 
         else:
-            v_p=self.selected_model.inner.volume_predict(node_fea,adj) 
+            v_p=self.selected_model.inner.volume_predict(node_fea,adj,self.edge_index) 
 
         return v_p
        
@@ -164,7 +167,7 @@ class NewModelAgent(DQNAgent):
 
     def f_s(self, states):
         states, l_emb, p_p = zip(*states)
-        v_p=self.volume_predict(l_emb, p_p)
+        v_p=self.volume_predict(l_emb, p_p)[:,:-1,:]
         states =self.arrange_volume_prediction(states, v_p)
         if 'NextPhase' in states[0]:
             realp = tuple(self.phaseid2lanes[states[i]['NextPhase']].unsqueeze(-1) for i in self.indices)

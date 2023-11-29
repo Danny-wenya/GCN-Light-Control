@@ -117,10 +117,13 @@ class DQNMain(MainFuncBase):
             self.FRAME = self.epoch * self.SIMULATE_TIME
 
         if best_model != '':
-            self.model_file = torch.load(best_model,
-                                         map_location = 'cpu')
-            self.agent.load_state_dict(self.model_file['state_dict'])
-            print('best model loaded')
+            try:
+                self.model_file = torch.load(best_model,
+                                            map_location = 'cpu')
+                self.agent.load_state_dict(self.model_file['state_dict'])
+                print('best model loaded')
+            except:
+                pass
             # self.epoch = self.model_file['epoch']
             # self.env.replay_count(self.model_file['replay_count'])
             # self.SIMULATE_TIME = simulate_time
