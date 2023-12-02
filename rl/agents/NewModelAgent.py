@@ -2,10 +2,11 @@ from .AgentBase import *
 from .DQNAgent import DQNAgent
 
 
+
 class NewModelAgent(DQNAgent):
     def __init__(self, NM_lane_embedding_size, NM_phase_loss_weight, 
                  NM_volume_loss_weight, NM_phase_loss_with_replay,
-                 out_road_embeddings, road_relation, NM_scale_by_lane_number,**kwargs):
+                 out_road_embeddings, road_relation, NM_scale_by_lane_number,metrics,**kwargs):
         self.hidden_size = kwargs['dqn_hidden_size']
         self.lane_embedding_size = NM_lane_embedding_size
         self.phase_loss_weight = NM_phase_loss_weight
@@ -13,21 +14,25 @@ class NewModelAgent(DQNAgent):
         self.lane_scale = NM_scale_by_lane_number
         self.road_relation = road_relation
         self.phase_loss_with_replay = NM_phase_loss_with_replay
+        self.metrics=metrics
         
         self.phase_loss = []
         self.volume_loss = []
         self.emb_loss = []
         self.direction_type = 3
-        super().__init__(lane_embedding_size = self.lane_embedding_size,
+        super().__init__(lane_embedding_size = self.lane_embedding_size,metrics=metrics,
                          **kwargs)
         self.phaseid2lanes = self.observation['phaseid2lanes']
         self.phase_loss_func = torch.nn.BCELoss()
-        self.volume_loss_func = torch.nn.MSELoss()
+        if metrics=='mse':
+            self.volume_loss_func = torch.nn.MSELoss()
+        elif metrics=='mape':
+            self.volume_loss_func = self.MAPE
 
         self.out_road_embedding = out_road_embeddings[0]
         self.opt = torch.optim.Adam(self.parameters(), self.LR)
         self._init_adj()
-        
+    
 
     def _init_adj(self):
         # 将所有路口的roalinks拉平排列,创建邻接矩阵
@@ -224,10 +229,12 @@ class NewModelAgent(DQNAgent):
         return res
     
     def calculate_loss(self, samples, frame, txsw_name, next_action,**kwargs):
-        L = super().calculate_loss(samples, frame, txsw_name, **kwargs)
+        L_reward,mape = super().calculate_loss(samples, frame,txsw_name,self.metrics, **kwargs)
         L_phase = -1  # use MSE, so never be negative
         L_volume = -1
         L_emb = -1
+        L=0
+        L+=L_reward
         if len(self.phase_loss) > 0:
             L_phase = torch.stack(self.phase_loss).mean()
             L += L_phase
@@ -250,7 +257,13 @@ class NewModelAgent(DQNAgent):
                 self.TXSW.add_scalar(txsw_name + '_v_out', L_emb.item(), frame)
         L_phase = 'NaN' if L_phase == -1 else ('%.5f' % L_phase)
         L_volume = 'NaN' if L_volume == -1 else ('%.5f' % L_volume)
-        log('phase loss: %9s, volume loss: %9s, action: %s' % (L_phase, L_volume,[i[0] for i in list(next_action[0])]),
-            level = 'TRACE')
+        if self.metrics=='mse':
+            log('phase loss: %9s, volume loss: %9s, reward loss: %.5f, reward mape: %.5f%%, action: %s' \
+                % (L_phase, L_volume,L_reward.item(),mape,[i[0] for i in list(next_action[0])]),
+                level = 'TRACE')
+        elif self.metrics=='mape':
+            log('phase loss: %9s, volume loss: %9s%%, reward loss: %.5f%%, action: %s' \
+                % (L_phase, L_volume,L_reward.item(),[i[0] for i in list(next_action[0])]),
+                level = 'TRACE')
         
         return L

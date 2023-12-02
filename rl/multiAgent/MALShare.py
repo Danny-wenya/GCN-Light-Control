@@ -78,6 +78,7 @@ class MALShare(MAL):
         L = self.agent.calculate_loss(sample, frame, 'loss',next_action)
         self._loss_backward(L)
         self.agent.optimizer_step()
+        
 
     def action(self, states, eps = 0, model_name = 'update', **kwargs):
         # states: [Batch, Intersection, {data dict}]

@@ -165,6 +165,9 @@ def parse_args(input_args = sys.argv):
                         default=False)
     parser.add_argument('-DDu', '--dueling-dqn', action='store_true', 
                         default=False)
+    parser.add_argument('--lr-decay', action='store_true', default=True)
+    parser.add_argument('--lr-decay-ratio',type=float, default=0.1)
+    parser.add_argument('--metrics',type=str, default='mse')
     
     # gcn
     parser.add_argument('--num_nodes', type=int, default=72)

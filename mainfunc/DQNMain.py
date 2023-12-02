@@ -17,13 +17,17 @@ class DQNMain(MainFuncBase):
                  log_folder, work_folder, simulate_time, cityflow_config, 
                  cityflow_log, preload_model_file, test_round, 
                  dqn_split_model, clean_logs, 
-                 train_cityflow_config, wrapper_model,best_model,
+                 train_cityflow_config, wrapper_model,best_model,lr_decay,lr_decay_ratio,metrics,
                  **kwargs):
         self.SEED = seed
         self.randomstate = np.random.RandomState(seed)
         set_seed(seed)
         cuda(None, not no_cuda)
         self.DEV = development
+        self.lr_decay=lr_decay
+        self.lr_decay_ratio=lr_decay_ratio
+        self.metrics=metrics
+       
 
         self.envs = []
         env = env.lower()
@@ -80,6 +84,7 @@ class DQNMain(MainFuncBase):
             'action': self.env.action_space,
             'innerModel': inner_model, 
             'TXSW': self.TXSW,
+            'metrics':metrics,
             
         }
         if agent.lower() == 'dqn':
@@ -121,6 +126,9 @@ class DQNMain(MainFuncBase):
                 self.model_file = torch.load(best_model,
                                             map_location = 'cpu')
                 self.agent.load_state_dict(self.model_file['state_dict'])
+                for param_group in self.agent.agent.opt.param_groups:
+                    param_group['lr'] = 1e-3
+
                 print('best model loaded')
             except:
                 pass
@@ -128,6 +136,7 @@ class DQNMain(MainFuncBase):
             # self.env.replay_count(self.model_file['replay_count'])
             # self.SIMULATE_TIME = simulate_time
             # self.FRAME = self.epoch * self.SIMULATE_TIME
+            
 
 
         if test_round > 0:
@@ -177,6 +186,7 @@ class DQNMain(MainFuncBase):
         else:
             os.makedirs(self.model_folder)
 
+        self.opt_step=torch.optim.lr_scheduler.StepLR(self.agent.agent.opt,step_size=6,gamma=self.lr_decay_ratio)
         log('DQNMain init over')
 
     def get_env(self, args):
@@ -247,12 +257,13 @@ class DQNMain(MainFuncBase):
 
             action = next_action
             state = next_s
+            lr=self.opt_step.get_lr()[0]
 
             if self.FRAME % self.EVAL_INTERVAL == 0 and self.replay.full:
                 log('epoch %4d, frame %7d: start evaluate' 
                     % (self.epoch, self.FRAME))
                 eval_res = self.evaluate('update')
-                log('evaluate result:', eval_res)
+                log('metrics: %5s   evaluate result: %.10f  lr: %.10f'%(self.metrics,eval_res,lr))
                 if not self.BEST_RESULT or eval_res < self.BEST_RESULT:
                     self.BEST_RESULT = eval_res
                     self.agent.update_best()
@@ -272,6 +283,8 @@ class DQNMain(MainFuncBase):
                 self.eps(), 
                 tot_reward.mean(), 
                 result))
+        if lr>5*1e-5:
+            self.opt_step.step()
         self.TXSW.add_scalar('reward', tot_reward.mean(), self.FRAME)
         self.TXSW.add_scalar('result', result, self.FRAME)
 

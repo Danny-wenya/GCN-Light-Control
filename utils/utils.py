@@ -10,6 +10,7 @@ import wandb
 last_use_cuda = True
 
 
+
 def cuda(tensor, use_cuda = None):
     """
     A cuda wrapper

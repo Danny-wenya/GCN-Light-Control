@@ -21,11 +21,12 @@ class DQNAgent(AgentBase):
     def __init__(self, wrapperModel, 
                  observation, action, innerModel, TXSW,  # wrapperModel param
                  gamma, dqn_net_update_freq, learning_rate, double_dqn, 
-                 seed, n_steps, **kwargs):
+                 seed, n_steps,**kwargs):
         super().__init__(seed, **kwargs)
         self.TXSW = TXSW
         self.observation = observation
         self.action = action
+        
         model_args = {
             'observation': observation,
             'action': action,
@@ -59,8 +60,8 @@ class DQNAgent(AgentBase):
 
         self.update_count = 0
         self.opt = torch.optim.Adam(self.parameters(), self.LR)
-
         self.loss = torch.nn.MSELoss()
+        
 
         # add state dict of optimizer to state_dict
         def add_opt_state_dict_hook(self, state_dict, prefix, local_metadata):
@@ -81,6 +82,16 @@ class DQNAgent(AgentBase):
 
     """read optimizer state dict and delete it from dict
     """
+    @staticmethod
+    def MAPE(predict,true):
+        L=torch.mean(torch.abs((predict-true)/(true+1e-3)))*100
+        
+        if torch.isnan(L):
+            raise
+
+        return L
+    
+
     def _load_from_state_dict(self, state_dict, prefix, local_metadata, strict,
                               missing_keys, unexpected_keys, error_msgs):
         opt_key = prefix + 'opt'
@@ -195,7 +206,7 @@ class DQNAgent(AgentBase):
     def log_model_structure(self):
         log('model structure:\n', self.model_old, '\n-------', level = 'ALL')
 
-    def calculate_loss(self, samples, frame, txsw_name = ''):
+    def calculate_loss(self, samples, frame, txsw_name = '',metrics='mse'):
         self.model_old.eval()
         self.model_update.train()
         # each of 5 is a list contains BATCHNUM items.
@@ -228,13 +239,19 @@ class DQNAgent(AgentBase):
                     * next_q 
                     * cuda(torch.tensor(1 - ist).float()))
         q = state_q.gather(1, action.unsqueeze(-1)).squeeze(1)
-        L = self.loss(q, reward_b)
-        # L.backward()
-        # self.opt.step()
+
+        if metrics=='mse':
+            L = self.loss(q, reward_b)
+            with torch.no_grad():
+                mape=self.MAPE(q,reward_b).item() 
+        elif metrics=='mape':
+            L=self.MAPE(q,reward_b) 
+            mape=L.item()
+
         if txsw_name != '':
             self.TXSW.add_scalar(txsw_name, L.item(), frame)
-        # return L.item()
-        return L
+    
+        return L,mape
 
     def optimizer_step(self):
         self.opt.step()
@@ -242,3 +259,7 @@ class DQNAgent(AgentBase):
         self.update_count += 1
         if self.update_count % self.UPDATE == 0:
             self.model_old.load_state_dict(self.model_update.state_dict())
+
+        
+
+      

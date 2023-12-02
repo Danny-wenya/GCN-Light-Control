@@ -79,6 +79,18 @@ def main_wrapper(args):
 
 
 if __name__ == "__main__":
-    argv=["main.py", "--config", "configs/main/UniLight.yml", "--cityflow-config", "configs/cityflow/SH1.yml"]
-    main_wrapper(argv)
+    train=True
+    test=False
+    if train:
+        # for training
+        argv=["main.py", "--config", "configs/main/UniLight.yml", "--cityflow-config", "configs/cityflow/SH1.yml"]
+        main_wrapper(argv)
+    elif test:
+        # for testing
+        argv=['main.py', '--config', 'configs/main/UniLight.yml', '--cityflow-config', 'configs/cityflow/SH1.yml', \
+            '--preload-model-file', '/code/GCN-Light-Control/logs/best_model/best.pt', '--test-round', '10']
+        main_wrapper(argv)
+
+    # for ubuntu
     # main_wrapper(sys.argv)
+

@@ -6,7 +6,7 @@ import torch.nn.init as init
 
 class NeighborAggregator(nn.Module):
     def __init__(self, input_dim, output_dim, 
-                 use_bias=False, aggr_method="mean"):
+                 use_bias=False, aggr_method="sum"):
         """聚合节点邻居
 
         Args:
@@ -53,9 +53,9 @@ class NeighborAggregator(nn.Module):
     
 
 class SageGCN(nn.Module):
-    def __init__(self, input_dim, hidden_dim,
+    def __init__(self, input_dim, hidden_dim,level,
                  activation=F.relu,
-                 aggr_neighbor_method="mean",
+                 aggr_neighbor_method="sum",
                  aggr_hidden_method="sum"):
         """SageGCN层定义
 
@@ -71,6 +71,7 @@ class SageGCN(nn.Module):
         super(SageGCN, self).__init__()
         assert aggr_neighbor_method in ["mean", "sum", "max"]
         assert aggr_hidden_method in ["sum", "concat"]
+        self.level=level
         self.input_dim = input_dim
         self.hidden_dim = hidden_dim
         self.aggr_neighbor_method = aggr_neighbor_method
@@ -85,11 +86,13 @@ class SageGCN(nn.Module):
     def reset_parameters(self):
         init.kaiming_uniform_(self.weight)
 
-    def forward(self, src_node_features, neighbor_node_features):
+    def forward(self, src_node_features, neighbor_node_features,hop):
         neighbor_hidden = self.aggregator(neighbor_node_features)
         self_hidden = torch.matmul(src_node_features, self.weight)
         
-        if self.aggr_hidden_method == "sum":
+        if self.level==0 and hop==0:
+            hidden = neighbor_hidden
+        elif self.aggr_hidden_method == "sum":
             hidden = self_hidden + neighbor_hidden
         elif self.aggr_hidden_method == "concat":
             hidden = torch.cat([self_hidden, neighbor_hidden], dim=1)
@@ -116,23 +119,23 @@ class GraphSage(nn.Module):
         self.num_neighbors_list = num_neighbors_list
         self.num_layers = len(num_neighbors_list)
         self.gcn = nn.ModuleList()
-        self.gcn.append(SageGCN(input_dim, hidden_dim[0]))
+        self.gcn.append(SageGCN(input_dim, hidden_dim[0],0))
         for index in range(0, len(hidden_dim) - 2):
-            self.gcn.append(SageGCN(hidden_dim[index], hidden_dim[index+1]))
-        self.gcn.append(SageGCN(hidden_dim[-2], hidden_dim[-1], activation=None))
+            self.gcn.append(SageGCN(hidden_dim[index], hidden_dim[index+1],index+1))
+        self.gcn.append(SageGCN(hidden_dim[-2], hidden_dim[-1],len(self.hidden_dim)-1 ,activation=None))
        
 
     def forward(self, node_features_list):
         hidden = node_features_list
-        for l in range(self.num_layers):
+        for i in range(self.num_layers):
             next_hidden = []
-            gcn = self.gcn[l]
-            for hop in range(self.num_layers - l):
+            gcn = self.gcn[i]
+            for hop in range(self.num_layers - i):
                 src_node_features = hidden[hop]
                 src_node_num = src_node_features.shape[1]
                 neighbor_node_features = hidden[hop + 1] \
                     .view((hidden[hop + 1].shape[0],src_node_num, self.num_neighbors_list[hop], -1))
-                h = gcn(src_node_features, neighbor_node_features)
+                h = gcn(src_node_features, neighbor_node_features,hop)
                 next_hidden.append(h)
             hidden = next_hidden
         return hidden[0]
