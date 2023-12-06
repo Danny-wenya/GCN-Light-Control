@@ -9,13 +9,13 @@ n-frames: 480000
 evaluate-interval: 12000
 dqn-replay-size: 8000
 dqn-hidden-size: 64
-learning-rate: 1e-2
+learning-rate: 0.0002
 dqn-batch-size: 32
 gamma: 0.8
-dqn-initial-eps: 1
+dqn-initial-eps: 0.02
 dqn-final-eps: 0.02
 dqn-explore-len-frac: 0.3
 dqn-net-update-freq: 5
 lr-decay: True
-lr-decay-ratio: 0.8
+lr-decay-ratio: 0.9
 metrics: mse

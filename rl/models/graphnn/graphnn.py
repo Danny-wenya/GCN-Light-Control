@@ -36,7 +36,6 @@ class GCN(nn.Module):
 
 
 
-
 import torch
 import math
 from torch import nn

@@ -234,7 +234,7 @@ class NewModelAgent(DQNAgent):
         L_volume = -1
         L_emb = -1
         L=0
-        L+=L_reward
+        L+=100*L_reward  # 强调Q的计算准确度最重要
         if len(self.phase_loss) > 0:
             L_phase = torch.stack(self.phase_loss).mean()
             L += L_phase
@@ -246,7 +246,7 @@ class NewModelAgent(DQNAgent):
             self.emb_loss = []
         if len(self.volume_loss) > 0:
             L_volume = torch.stack(self.volume_loss).mean()
-            L += L_volume
+            L += 5*L_volume
             self.volume_loss = []
         if txsw_name != '':
             if L_phase != -1:
@@ -258,8 +258,8 @@ class NewModelAgent(DQNAgent):
         L_phase = 'NaN' if L_phase == -1 else ('%.5f' % L_phase)
         L_volume = 'NaN' if L_volume == -1 else ('%.5f' % L_volume)
         if self.metrics=='mse':
-            log('phase loss: %9s, volume loss: %9s, reward loss: %.5f, reward mape: %.5f%%, action: %s' \
-                % (L_phase, L_volume,L_reward.item(),mape,[i[0] for i in list(next_action[0])]),
+            log('phase: %9s, volume: %9s, reward: %.5f, total: %.5f, action: %s' \
+                % (L_phase, L_volume ,L_reward.item() ,L.item()  ,[i[0] for i in list(next_action[0])]),
                 level = 'TRACE')
         elif self.metrics=='mape':
             log('phase loss: %9s, volume loss: %9s%%, reward loss: %.5f%%, action: %s' \

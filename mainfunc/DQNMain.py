@@ -127,7 +127,7 @@ class DQNMain(MainFuncBase):
                                             map_location = 'cpu')
                 self.agent.load_state_dict(self.model_file['state_dict'])
                 for param_group in self.agent.agent.opt.param_groups:
-                    param_group['lr'] = 1e-3
+                    param_group['lr'] = 1e-5
 
                 print('best model loaded')
             except:
@@ -283,7 +283,7 @@ class DQNMain(MainFuncBase):
                 self.eps(), 
                 tot_reward.mean(), 
                 result))
-        if lr>5*1e-5:
+        if lr>1e-5:
             self.opt_step.step()
         self.TXSW.add_scalar('reward', tot_reward.mean(), self.FRAME)
         self.TXSW.add_scalar('result', result, self.FRAME)
